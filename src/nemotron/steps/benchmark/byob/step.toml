@@ -1,0 +1,49 @@
+[step]
+id = "benchmark/byob"
+name = "Bring Your Own Benchmark"
+category = "benchmark"
+description = "Generate and translate BYOB MCQ benchmark parquet artifacts from domain documents with an extensible benchmark-family runtime."
+tags = ["benchmark", "byob", "mcq", "data-designer", "translation"]
+
+[[consumes]]
+type = "benchmark_source_corpus"
+description = "Domain source documents grouped by target subject for benchmark generation."
+
+[[consumes]]
+type = "benchmark_parquet"
+description = "Existing benchmark parquet for translation-only runs."
+required = false
+
+[[produces]]
+type = "mcq_benchmark_parquet"
+description = "Generated MCQ benchmark parquet with MMLU-Pro-style columns."
+
+[[produces]]
+type = "translated_mcq_benchmark_parquet"
+description = "Translated MCQ benchmark parquet with the same question and option schema."
+required = false
+
+[[parameters]]
+name = "family"
+description = "Benchmark family implementation to run."
+default = "mcq"
+choices = ["mcq"]
+
+[[parameters]]
+name = "stage"
+description = "BYOB pipeline stage to run."
+default = "generate"
+choices = ["prepare", "generate", "translate"]
+
+[[parameters]]
+name = "config"
+description = "Path to a BYOB YAML config."
+
+[[parameters]]
+name = "skip_until"
+description = "Optional resume stage enum name for cached generation or translation runs."
+
+[reference]
+skill = "src/nemotron/steps/byob/SKILL.md"
+entrypoint = "src/nemotron/steps/byob/scripts/run.py"
+runtime = "src/nemotron/steps/byob/runtime/pipeline.py"
