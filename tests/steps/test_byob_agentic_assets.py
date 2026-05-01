@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -111,6 +112,24 @@ def test_byob_root_cli_lists_families() -> None:
 
     assert result.exit_code == 0, result.output
     assert result.output.splitlines() == ["mcq"]
+
+
+def test_byob_use_case_notebook_uses_current_step_structure() -> None:
+    example_dir = REPO_ROOT / "use-case-examples" / "build-your-own-benchmark"
+    notebook_path = example_dir / "build_mcq_benchmark.ipynb"
+
+    assert (example_dir / "README.md").exists()
+    assert notebook_path.exists()
+
+    data = json.loads(notebook_path.read_text(encoding="utf-8"))
+    notebook_text = "\n".join(
+        "".join(cell.get("source", [])) for cell in data.get("cells", []) if isinstance(cell, dict)
+    )
+
+    assert "src/nemotron/steps/byob/config/default.yaml" in notebook_text
+    assert "nemotron byob" in notebook_text
+    assert "benchmark/byob" not in notebook_text
+    assert "nemotron.steps.byob.config" not in notebook_text
 
 
 def test_byob_adapter_round_trip() -> None:
