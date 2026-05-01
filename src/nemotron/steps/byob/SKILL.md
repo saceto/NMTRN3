@@ -16,8 +16,8 @@ Use this skill to create or translate benchmark artifacts while keeping benchmar
 
 1. Read [references/STEP.md](references/STEP.md) for the artifact contract.
 2. Start from [config/default.yaml](config/default.yaml) for MCQ generation or [config/translate.yaml](config/translate.yaml) for translation.
-3. Run `python -m nemotron.steps.byob.scripts.run --family mcq --stage prepare --config CONFIG`.
-4. Run `python -m nemotron.steps.byob.scripts.run --family mcq --stage generate --config CONFIG`.
+3. Run `nemotron byob --family mcq --stage prepare --config CONFIG`.
+4. Run `nemotron byob --family mcq --stage generate --config CONFIG`.
 5. Translate an existing benchmark with `--stage translate` and a translation config.
 
 ## Change Points
@@ -39,7 +39,7 @@ Use this skill to create or translate benchmark artifacts while keeping benchmar
 ## Validate
 
 - Run `python -m nemotron.steps.byob.scripts.validate`.
-- Run `python -m nemotron.steps.byob.scripts.run --list-families`.
+- Run `nemotron byob --list-families`.
 - Confirm final generation outputs `benchmark_raw.parquet` and `benchmark.parquet`.
 - Confirm translated outputs preserve row count unless `remove_low_quality` is intentionally enabled.
 

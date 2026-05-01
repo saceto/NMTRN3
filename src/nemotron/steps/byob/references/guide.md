@@ -15,11 +15,20 @@ subject maps to few-shot source subjects from the configured Hugging Face benchm
 8. Applies hallucination and easiness filters.
 9. Exports the final MCQ benchmark parquet.
 
+Run generation through the installed CLI:
+
+```bash
+nemotron byob --family mcq --stage prepare --config src/nemotron/steps/byob/config/default.yaml
+nemotron byob --family mcq --stage generate --config src/nemotron/steps/byob/config/default.yaml
+```
+
 ## Translation
 
 The translation run expects an MCQ benchmark parquet with stable question IDs and option lists. It translates
 questions and choices, backtranslates the result, computes configured quality metrics, and exports the final
 translated benchmark.
+
+Run translation through the same CLI with `--stage translate` and a translation config.
 
 ## Extending To Another Family
 

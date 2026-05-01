@@ -102,6 +102,17 @@ def test_byob_imports_are_lightweight() -> None:
     assert list_family_names() == ("mcq",)
 
 
+def test_byob_root_cli_lists_families() -> None:
+    from typer.testing import CliRunner
+
+    from nemotron.cli.bin.nemotron import app
+
+    result = CliRunner().invoke(app, ["byob", "--list-families"])
+
+    assert result.exit_code == 0, result.output
+    assert result.output.splitlines() == ["mcq"]
+
+
 def test_byob_adapter_round_trip() -> None:
     from nemotron.steps.byob import flatten_mcq_records, restore_mcq_records
 
