@@ -53,6 +53,8 @@ Also read in Orient (small files, always cheap):
 Step-specific caution: for BYOB benchmark translation, use the `byob` context pack.
 Do not substitute the general `translate/nemo-skills` pack; BYOB translation uses
 Curator experimental translation, backtranslation metrics, and preserved benchmark schema.
+For BYOB generation, use Curator semantic deduplication with RayDataExecutor,
+RayActorPoolExecutor, and SemanticDeduplicationWorkflow as documented in the `byob` context pack.
 
 **Ask the user if any of these are unclear:**
 

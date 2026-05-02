@@ -8,7 +8,7 @@ subject maps to few-shot source subjects from the configured Hugging Face benchm
 1. Samples few-shot examples and target document chunks into `seed.parquet`.
 2. Generates candidate MCQs with Data Designer.
 3. Judges candidate quality.
-4. Applies semantic deduplication.
+4. Applies semantic deduplication with Curator's current semantic dedup workflow.
 5. Optionally expands distractors from four choices to ten.
 6. Optionally measures document coverage.
 7. Checks distractor validity and semantic outliers.
@@ -21,6 +21,11 @@ Run generation through the installed CLI:
 nemotron byob --family mcq --stage prepare --config src/nemotron/steps/byob/config/default.yaml
 nemotron byob --family mcq --stage generate --config src/nemotron/steps/byob/config/default.yaml
 ```
+
+When editing semantic deduplication, keep the Curator imports aligned with the runtime:
+`nemo_curator.backends.ray_data.RayDataExecutor`,
+`nemo_curator.backends.ray_actor_pool.RayActorPoolExecutor`, and
+`nemo_curator.stages.deduplication.semantic.SemanticDeduplicationWorkflow`.
 
 ## Translation
 

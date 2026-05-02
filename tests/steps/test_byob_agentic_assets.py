@@ -215,6 +215,35 @@ def test_byob_translation_has_no_data_designer_fallback() -> None:
     assert "data_designer" not in (translation_root / "translate.py").read_text(encoding="utf-8")
 
 
+def test_byob_agent_assets_document_current_curator_namespaces() -> None:
+    customize_root = REPO_ROOT / "skills" / "nemotron-customize"
+    context_path = (
+        customize_root
+        / "context"
+        / "byob-benchmark-curator-translation.txt"
+    )
+    agent_text = "\n".join(
+        [
+            (BYOB_ROOT / "SKILL.md").read_text(encoding="utf-8"),
+            (BYOB_ROOT / "step.toml").read_text(encoding="utf-8"),
+            (BYOB_ROOT / "references" / "STEP.md").read_text(encoding="utf-8"),
+            (BYOB_ROOT / "references" / "guide.md").read_text(encoding="utf-8"),
+            (BYOB_ROOT / "references" / "quality-and-filtering.md").read_text(encoding="utf-8"),
+            (BYOB_ROOT / "patterns" / "create-byob-mcq-from-domain-corpus.md").read_text(encoding="utf-8"),
+            (customize_root / "SKILL.md").read_text(encoding="utf-8"),
+            (customize_root / "context" / "index.toml").read_text(encoding="utf-8"),
+            context_path.read_text(encoding="utf-8"),
+        ]
+    )
+
+    assert "Curator semantic deduplication" in agent_text
+    assert "nemo_curator.backends.ray_data" in agent_text
+    assert "nemo_curator.backends.ray_actor_pool" in agent_text
+    assert "nemo_curator.stages.deduplication.semantic" in agent_text
+    assert "nemo_curator.stages.text.experimental.translation" in agent_text
+    assert "TextQualityMetricStage" in agent_text
+
+
 def test_byob_translation_uses_curator_experimental_namespace() -> None:
     translation_root = BYOB_ROOT / "runtime" / "translation"
     runtime_text = "\n".join(
@@ -226,6 +255,17 @@ def test_byob_translation_uses_curator_experimental_namespace() -> None:
 
     assert "nemo_curator.stages.text.experimental.translation" in runtime_text
     assert "nemo_curator.stages.text.translation" not in runtime_text
+
+
+def test_byob_uses_current_curator_backend_namespace() -> None:
+    deduplication_text = (BYOB_ROOT / "runtime" / "deduplication.py").read_text(encoding="utf-8")
+
+    assert "nemo_curator.backends.ray_data" in deduplication_text
+    assert "nemo_curator.backends.ray_actor_pool" in deduplication_text
+    assert "EmbeddingCreatorStage" in deduplication_text
+    assert "RayActorPoolExecutor" in deduplication_text
+    assert "RayDataExecutor" in deduplication_text
+    assert "nemo_curator.stages.deduplication.semantic import SemanticDeduplicationWorkflow" in deduplication_text
 
 
 def test_byob_translation_pipeline_uses_curator_adapter(monkeypatch: pytest.MonkeyPatch) -> None:

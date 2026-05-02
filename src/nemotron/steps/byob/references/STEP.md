@@ -29,6 +29,7 @@ compute:
   optional_services:
     - OpenAI-compatible LLM endpoint
     - embedding model downloads
+    - Curator semantic deduplication backend
     - Curator experimental translation backend
 source:
   - repo: Nemotron
@@ -44,6 +45,12 @@ family is `mcq`; new families should add isolated modules under `runtime/benchma
 
 The MCQ generation path writes stage cache parquet files under `output_dir/expt_name/stage_cache/`, then
 writes `benchmark_raw.parquet` and filtered `benchmark.parquet`.
+
+Semantic deduplication computes embeddings with Curator, then runs
+`nemo_curator.backends.ray_actor_pool.RayActorPoolExecutor` for KMeans,
+`nemo_curator.backends.ray_data.RayDataExecutor` for embedding and pairwise stages,
+and `nemo_curator.stages.deduplication.semantic.SemanticDeduplicationWorkflow`
+for orchestration.
 
 The translation path reads an existing benchmark parquet, flattens MCQ text for Curator experimental
 translation, writes translation and quality cache files, then writes translated `benchmark_raw.parquet`
