@@ -58,4 +58,8 @@ recovery = "Match the tokenizer to the downstream pretraining model, then rerun.
 
 [reference]
 script = "src/nemotron/data_prep/recipes/pretrain.py"
+megatron_bridge_repo = "https://github.com/NVIDIA-NeMo/Megatron-Bridge"
+megatron_bridge_docs = "https://docs.nvidia.com/nemo/megatron-bridge/latest/"
+automodel_repo = "https://github.com/NVIDIA-NeMo/Automodel"
+automodel_docs = "https://docs.nvidia.com/nemo/automodel/latest/index.html"
 skills = ["skills/nemotron-customize/context/nemotron-data-prep.txt"]

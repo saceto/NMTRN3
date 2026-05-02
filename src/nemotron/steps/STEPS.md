@@ -25,14 +25,14 @@
 | Step | Description | Consumes | Produces |
 | --- | --- | --- | --- |
 | [optimize/modelopt/distill](optimize/modelopt/distill/) | Distill a student model from a teacher model with NVIDIA Model Optimizer and Megatron-Bridge. Can run standalone or recover quality after pruning or quantization; real-data runs consume Megatron bin/idx data. | checkpoint_hf, binidx (optional) | checkpoint_megatron |
-| [optimize/modelopt/prune](optimize/modelopt/prune/) | Prune a HuggingFace model with NVIDIA Model Optimizer's Minitron flow in the Megatron-Bridge framework. Supports target-parameter search or manual architecture pruning via prune_export_config. | checkpoint_hf | checkpoint_hf |
-| [optimize/modelopt/quantize](optimize/modelopt/quantize/) | Post-training quantization with NVIDIA Model Optimizer through Megatron-Bridge. Supports Super3 FP8 recipes for Hopper/H100 and NVFP4 recipes for Blackwell/B200, producing Megatron distributed checkpoints ready for export/evaluation. | checkpoint_hf | checkpoint_megatron |
+| [optimize/modelopt/prune](optimize/modelopt/prune/) | Prune HuggingFace GPT/Mamba-family checkpoints with NVIDIA Model Optimizer and Megatron-Bridge. Supports target-parameter search or manual architecture pruning via config-controlled upstream arguments. | checkpoint_hf | checkpoint_hf |
+| [optimize/modelopt/quantize](optimize/modelopt/quantize/) | Post-training quantization with NVIDIA Model Optimizer through Megatron-Bridge. Supports generic PTQ recipes such as FP8/NVFP4 plus model-specific recipes when the upstream Megatron-Bridge script supports them, producing Megatron distributed checkpoints ready for export/evaluation. | checkpoint_hf | checkpoint_megatron |
 
 ## peft — Parameter-Efficient Fine-Tuning
 
 | Step | Description | Consumes | Produces |
 | --- | --- | --- | --- |
-| [peft/automodel](peft/automodel/) | Parameter-efficient fine-tuning (LoRA) with the AutoModel stack. Same training loop as sft/automodel but with a LoRA adapter wired in by default — best for small GPU counts where a full SFT would not fit. | training_jsonl | checkpoint_lora |
+| [peft/automodel](peft/automodel/) | Parameter-efficient fine-tuning (LoRA) with the AutoModel stack. Same training loop as sft/automodel but with a LoRA adapter wired in by default, making larger HF backbones practical for adapter-based tuning. | training_jsonl | checkpoint_lora |
 | [peft/megatron_bridge](peft/megatron_bridge/) | Parameter-efficient fine-tuning (LoRA) on top of Megatron-Bridge. Useful when a full SFT exceeds memory but you still want TP/PP/CP scaling. Consumes packed Parquet from prep/sft_packing. | packed_parquet, checkpoint_megatron | checkpoint_lora |
 
 ## prep — Data Preparation
@@ -62,7 +62,7 @@
 
 | Step | Description | Consumes | Produces |
 | --- | --- | --- | --- |
-| [sft/automodel](sft/automodel/) | Supervised fine-tuning with the AutoModel stack. Best for smaller GPU counts, rapid iteration, and LoRA-style adapter tuning on JSONL datasets that already use OpenAI chat-format messages. | training_jsonl | checkpoint_hf |
+| [sft/automodel](sft/automodel/) | Supervised fine-tuning with the AutoModel stack for HF-format models and JSONL datasets that already use OpenAI chat-format messages. Supports full SFT and LoRA-style adapter tuning from the same step. | training_jsonl | checkpoint_hf |
 | [sft/megatron_bridge](sft/megatron_bridge/) | Supervised fine-tuning using NVIDIA Megatron-Bridge. Best for large-scale distributed training with tensor/pipeline/context parallelism. Requires packed Parquet data from prep/sft_packing. | packed_parquet, checkpoint_megatron (optional) | checkpoint_megatron |
 
 ## synth — Synthetic Data Generation

@@ -18,9 +18,8 @@ name = "Quantization (ModelOpt + Megatron-Bridge)"
 category = "optimize"
 description = """\
 Post-training quantization with NVIDIA Model Optimizer through Megatron-Bridge.
-Supports generic PTQ recipes such as FP8/NVFP4 plus model-specific recipes when
-the upstream Megatron-Bridge script supports them, producing Megatron distributed
-checkpoints ready for export/evaluation."""
+Supports PTQ recipes accepted by the installed Megatron-Bridge script, producing
+Megatron distributed checkpoints ready for export/evaluation."""
 tags = ["optimize", "modelopt", "quantization", "ptq", "fp8", "nvfp4", "megatron-bridge"]
 
 [[consumes]]
@@ -34,8 +33,8 @@ description = "Quantized Megatron distributed checkpoint."
 
 [[parameters]]
 name = "args.export_quant_cfg"
-description = "ModelOpt/Megatron-Bridge quantization recipe, e.g. fp8, nvfp4, or a model-specific recipe."
-default = "mamba_moe_fp8_conservative"
+description = "ModelOpt/Megatron-Bridge quantization recipe: int8_sq, fp8, fp8_blockwise, int4_awq, w4a8_awq, or nvfp4."
+default = "fp8"
 
 [[parameters]]
 name = "args.calib_size"
@@ -49,11 +48,11 @@ default = []
 
 [[strategies]]
 when = "Target hardware is Hopper/H100"
-then = "Start with config/fp8.yaml. Use args.export_quant_cfg=fp8 for generic models or the Mamba-MoE recipe for Nemotron Super."
+then = "Start with config/fp8.yaml and args.export_quant_cfg=fp8."
 
 [[strategies]]
 when = "Target hardware is Blackwell/B200"
-then = "Start with config/nvfp4.yaml. Use args.export_quant_cfg=nvfp4 for generic models or the Mamba-MoE recipe for Nemotron Super."
+then = "Start with config/nvfp4.yaml and args.export_quant_cfg=nvfp4."
 
 [[strategies]]
 when = "Need a HuggingFace checkpoint"
@@ -61,6 +60,11 @@ then = "Export the produced Megatron checkpoint with /opt/Megatron-Bridge/exampl
 
 [reference]
 nemotron_quantization = "https://github.com/NVIDIA-NeMo/Nemotron/blob/main/docs/nemotron/super3/quantization.md"
-modelopt = "https://github.com/NVIDIA/Model-Optimizer"
-megatron_bridge = "https://github.com/NVIDIA-NeMo/Megatron-Bridge"
+modelopt_repo = "https://github.com/NVIDIA/Model-Optimizer"
+modelopt_readme = "https://github.com/NVIDIA/Model-Optimizer/blob/main/README.md"
+modelopt_docs = "https://nvidia.github.io/Model-Optimizer/"
+modelopt_megatron_bridge_readme = "https://github.com/NVIDIA/Model-Optimizer/blob/main/examples/megatron_bridge/README.md"
+megatron_bridge_repo = "https://github.com/NVIDIA-NeMo/Megatron-Bridge"
+megatron_bridge_docs = "https://docs.nvidia.com/nemo/megatron-bridge/latest/"
+megatron_bridge_quantization_docs = "https://docs.nvidia.com/nemo/megatron-bridge/latest/modelopt/quantization.html"
 skills = ["skills/nemotron-customize/context/modelopt-optimization.txt"]

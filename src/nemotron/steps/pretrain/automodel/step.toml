@@ -50,5 +50,11 @@ when = "Pretraining from scratch"
 then = "Set load_weights=false and use a warmup + cosine schedule sized to the token budget."
 
 [reference]
-script = "https://github.com/NVIDIA-NeMo/Automodel/blob/main/nemo_automodel/recipes/llm/train_pretrain.py"
+repo = "https://github.com/NVIDIA-NeMo/Automodel"
+readme = "https://github.com/NVIDIA-NeMo/Automodel/blob/main/README.md"
+docs = "https://docs.nvidia.com/nemo/automodel/latest/index.html"
+pretrain_guide = "https://docs.nvidia.com/nemo/automodel/latest/guides/llm/nanogpt-pretraining.html"
+recipes_overview = "https://docs.nvidia.com/nemo/automodel/latest/guides/overview.html"
+examples = "https://github.com/NVIDIA-NeMo/Automodel/tree/main/examples/llm_pretrain"
+recipe_script = "https://github.com/NVIDIA-NeMo/Automodel/blob/main/nemo_automodel/recipes/llm/train_ft.py"
 skills = ["skills/nemotron-customize/context/automodel-pretrain.txt"]

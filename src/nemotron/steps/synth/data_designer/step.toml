@@ -56,6 +56,9 @@ when = "Output needs to feed prep/sft_packing"
 then = "Add a final post-processing column or transform that projects the generated columns into OpenAI 'messages' chat format."
 
 [reference]
-docs = "https://nvidia-nemo.github.io/DataDesigner/latest/"
-upstream = "https://github.com/NVIDIA-NeMo/DataDesigner"
+repo = "https://github.com/NVIDIA-NeMo/DataDesigner"
+readme = "https://github.com/NVIDIA-NeMo/DataDesigner/blob/main/README.md"
+library_docs = "https://nvidia-nemo.github.io/DataDesigner/"
+nemo_platform_docs = "https://docs.nvidia.com/nemo/microservices/latest/data-designer/index.html"
+nemo_platform_quickstart = "https://docs.nvidia.com/nemo/microservices/latest/data-designer/quickstart.html"
 skills = ["skills/nemotron-customize/context/data-designer-synth.txt"]

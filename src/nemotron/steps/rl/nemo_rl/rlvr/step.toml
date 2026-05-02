@@ -48,7 +48,7 @@ default = true
 
 [[parameters]]
 name = "env.should_use_nemo_gym"
-description = "Switch from the upstream math example to the generic NeMo-Gym GRPO runner."
+description = "Switch from the upstream generic GRPO example to the explicit NeMo-Gym GRPO runner."
 default = false
 
 [[strategies]]
@@ -60,5 +60,5 @@ when = "You have Super3-style JSONL or resource-server rewards"
 then = "Start from config/nemo_gym.yaml and set data.train.data_path, data.validation.data_path, and env.nemo_gym.config_paths."
 
 [reference]
-script = "https://github.com/NVIDIA-NeMo/RL/blob/main/examples/run_grpo_math.py"
+script = "https://github.com/NVIDIA-NeMo/RL/blob/main/examples/run_grpo.py"
 skills = ["skills/nemotron-customize/context/nemo-rl-alignment.txt"]
