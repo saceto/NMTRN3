@@ -16,17 +16,19 @@
 # Schema mirrors the NVIDIA-NeMo/DataDesigner Python SDK; column specs are
 # translated by step.py into the corresponding typed config builder calls.
 #
-# Defaults are local-friendly: output lands under $NEMO_RUN_DIR (or ./output
-# when unset) and the seed dataset comes from ./seeds.jsonl. Override either at
-# the CLI: `output_path=… seed_dataset.path=…`.
+# Defaults are Lepton-friendly and local-friendly: output lands under
+# $SDG_OUTPUT_DIR when set, otherwise $NEMO_RUN_DIR/synth or ./output/synth.
+# The seed dataset is packaged with this step. Override either at the CLI:
+# `output_path=... seed_dataset.path=...`.
 
-output_path: ${oc.env:NEMO_RUN_DIR,${oc.env:PWD}/output}/synth/sft.jsonl
+output_dir: ${oc.env:SDG_OUTPUT_DIR,${oc.env:NEMO_RUN_DIR,${oc.env:PWD}/output}/synth}
+output_path: ${output_dir}/sft.jsonl
 num_records: 1000
 
-# Optional: seed dataset to drive the `seed`-typed columns below.
 seed_dataset:
-  path: ${oc.env:PWD}/seeds.jsonl
+  path: ${oc.env:PWD}/src/nemotron/steps/synth/data_designer/data/sft_topic_seeds.jsonl
   strategy: shuffle           # shuffle | ordered
+  fields: [topic]
 
 # Models map an `alias` (referenced by llm_text/llm_structured columns) to a
 # concrete model + provider + inference parameters. Override per-environment:

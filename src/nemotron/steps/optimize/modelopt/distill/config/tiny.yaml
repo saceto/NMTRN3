@@ -12,31 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Hopper/H100 FP8 PTQ config.
+defaults: default.yaml
 
-script:
-  path: null
-  flag_style: hyphen
+run:
+  env:
+    nodes: 2
+    gpus_per_node: 8
+    nprocs_per_node: 8
 
 args:
-  hf_model_id: nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-Base-BF16
-  trust_remote_code: true
-
-  export_quant_cfg: fp8
-  megatron_save_path: ${oc.env:NEMO_RUN_DIR,${oc.env:PWD}/output}/optimize/quantize/super3-fp8
-
-  # Nemotron Nano's Mamba ngroups must be divisible by tensor parallel size.
-  # Keep the 16-GPU launch shape as tp=8 x pp=2.
-  tp: 8
-  pp: 2
-  ep: 8
-  etp: 1
-
-  # Nemotron docs mention 256 calibration samples for the FP8 checkpoint; 512 is
-  # a cautious smoke/default. Override to 256 to match the published recipe.
-  calib_size: 512
+  use_mock_data: true
+  seq_length: 1024
+  gbs: 8
+  train_iters: 2
+  lr_warmup_iters: 1
+  eval_interval: 1
+  eval_iters: 1
+  output_dir: ${oc.env:OPTIM_OUTPUT_DIR,${oc.env:PWD}/output}/distill/tiny
 
 torchrun:
   nproc_per_node: 8
-
-extra_args: []

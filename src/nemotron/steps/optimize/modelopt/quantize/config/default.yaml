@@ -15,7 +15,9 @@
 # Generic PTQ quantization config for Megatron-Bridge + NVIDIA Model Optimizer.
 #
 # References:
-# - Nemotron Super3 quantization: FP8 for Hopper/H100, NVFP4 for Blackwell/B200.
+# - Use Nemotron 3 Nano 30B for launch validation; larger checkpoints can be
+#   supplied with args.hf_model_id when validating production scale.
+# - FP8 targets Hopper/H100; NVFP4 targets Blackwell/B200.
 # - Model Optimizer supports PTQ/QAT and mixed-precision recipes through the
 #   Megatron-Bridge quantization scripts.
 #
@@ -34,24 +36,25 @@ script:
 
 args:
   # HuggingFace model id or local HF checkpoint path.
-  hf_model_id: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-BF16
+  hf_model_id: nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-Base-BF16
 
   # Trust custom model code from the HF repo/path.
   trust_remote_code: true
 
-  # Quantization recipe. Use generic recipes such as fp8/nvfp4 for broadly
-  # supported models, or model-specific recipes when the upstream script supports
-  # them, e.g. mamba_moe_fp8_conservative for Nemotron Super.
-  export_quant_cfg: mamba_moe_fp8_conservative
+  # Quantization recipe. Match the choices accepted by the installed upstream
+  # quantize.py: int8_sq, fp8, fp8_blockwise, int4_awq, w4a8_awq, or nvfp4.
+  export_quant_cfg: fp8
 
   # Output Megatron distributed checkpoint path. Export to HF afterwards with
   # /opt/Megatron-Bridge/examples/quantization/export.py if deployment needs HF.
   megatron_save_path: ${oc.env:NEMO_RUN_DIR,${oc.env:PWD}/output}/optimize/quantize/super3-fp8
 
   # Parallelism. World size must be compatible with tp * pp and expert layout.
+  # Nemotron Nano uses Mamba mixers whose ngroups must be divisible by tp; use
+  # tp=8, pp=2 on the 16-GPU functional profile instead of tp=16.
   tp: 8        # tensor parallel size
   pp: 2        # pipeline parallel size
-  ep: 8        # expert parallel size for MoE
+  ep: 8        # expert parallel size for MoE checkpoints
   etp: 1       # expert tensor parallel size
 
   # Calibration samples. PTQ guidance is typically 128-512 samples; NVFP4/QAD
@@ -75,5 +78,14 @@ torchrun:
   # node_rank: 0
   # master_addr: localhost
   # master_port: 29500
+
+wandb_wrapper:
+  # Upstream quantize.py does not expose W&B flags. This wrapper records
+  # command/config/status so functional runs still show up in W&B.
+  enabled: ${oc.decode:${oc.env:WANDB_ENABLED,false}}
+  project: ${oc.env:WANDB_PROJECT,null}
+  entity: ${oc.env:WANDB_ENTITY,null}
+  name: ${oc.env:WANDB_NAME,null}
+  job_type: modelopt-quantize
 
 extra_args: []

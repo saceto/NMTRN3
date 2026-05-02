@@ -22,6 +22,7 @@ dpo:
   val_global_batch_size: 8
   val_micro_batch_size: 1
   val_at_start: true
+  val_at_end: true
   seed: 42
 
   reference_policy_kl_penalty: 0.05
@@ -31,7 +32,7 @@ dpo:
   sft_loss_weight: 0
 
 policy:
-  model_name: /path/to/sft/checkpoint
+  model_name: ${oc.env:RL_POLICY_MODEL,meta-llama/Llama-3.2-1B-Instruct}
   tokenizer:
     name: ${policy.model_name}
   train_global_batch_size: 32
@@ -47,13 +48,20 @@ policy:
     name: cosine
     warmup_steps: 50
 
-# NeMo-RL built-in preference dataset. For HF datasets, prefer a converter that
-# emits NeMo-RL's expected chat/content format before switching dataset_name.
+# NeMo-RL preference dataset. Newer NeMo-RL versions expect dataset-specific
+# fields under train/validation, with shared defaults under default.
 data:
-  dataset_name: HelpSteer3
   max_input_seq_length: ${policy.max_total_sequence_length}
   shuffle: true
   num_workers: 1
+  train:
+    split: train
+  validation:
+    split: validation
+  default:
+    dataset_name: HelpSteer3
+    prompt_file: null
+    system_prompt_file: null
 
 checkpointing:
   enabled: true

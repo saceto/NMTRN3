@@ -86,4 +86,13 @@ torchrun:
   # master_addr: localhost
   # master_port: 29500
 
+wandb_wrapper:
+  # Upstream prune_minitron.py does not expose W&B flags. This wrapper records
+  # command/config/status so functional runs still show up in W&B.
+  enabled: ${oc.decode:${oc.env:WANDB_ENABLED,false}}
+  project: ${oc.env:WANDB_PROJECT,null}
+  entity: ${oc.env:WANDB_ENTITY,null}
+  name: ${oc.env:WANDB_NAME,null}
+  job_type: modelopt-prune
+
 extra_args: []

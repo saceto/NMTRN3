@@ -33,6 +33,7 @@ dpo:
   val_global_batch_size: 8
   val_micro_batch_size: 1
   val_at_start: false
+  val_at_end: false
   seed: 42
 
   reference_policy_kl_penalty: 0.05
@@ -107,14 +108,20 @@ policy:
     enabled: false
 
 data:
-  # HelpSteer3 is a zero-config built-in shipped in nemo-rl's expected
-  # message format. UltraFeedback's plain-string content format hits a v0.4.0
-  # bug in get_images_from_message (KeyError 'type'); use HelpSteer3 for
-  # smoke tests until that converter is patched.
-  dataset_name: HelpSteer3
+  # HelpSteer3 is a built-in preference dataset shipped in nemo-rl's expected
+  # message format. Newer NeMo-RL versions expect dataset-specific fields under
+  # train/validation and shared dataset defaults under default.
   max_input_seq_length: ${policy.max_total_sequence_length}
   shuffle: true
   num_workers: 1
+  train:
+    split: train
+  validation:
+    split: validation
+  default:
+    dataset_name: HelpSteer3
+    prompt_file: null
+    system_prompt_file: null
 
 logger:
   log_dir: ${oc.env:RL_OUTPUT_DIR,./output/rl}/dpo-logs

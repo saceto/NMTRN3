@@ -12,28 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Pretrain bin/idx tokenisation. HF-dataset compatible via the blend file.
+defaults: default.yaml
 
-blend_path: /path/to/pretrain_blend.json   # references HF or local datasets
-output_dir: /nemo_run/pretrain-binidx
-num_shards: 128
-valid_shards: 1
-test_shards: 1
-split_seed: 42
+run:
+  env:
+    nodes: 2
+    gpus_per_node: 8
+    nprocs_per_node: 8
 
-tokenizer:
-  model: nvidia/NVIDIA-Nemotron-Nano-9B-v2
-  add_bos: false
-  add_eos: true
+step_scheduler:
+  global_batch_size: 16
+  local_batch_size: 1
+  ckpt_every_steps: 5
+  val_every_steps: 5
+  max_steps: 5
 
-dtype: int32
-text_field: text
-min_doc_chars: null
-max_doc_tokens: null
+checkpoint:
+  checkpoint_dir: ${oc.env:SFT_OUTPUT_DIR,./output/peft-automodel-tiny}/checkpoints
 
-sample: null
-sample_seed: 42
-force: false
+dataset:
+  path_or_dataset_id: HuggingFaceH4/ultrachat_200k
+  split: train_sft[:64]
 
-observability:
-  pipeline_logging_interval_s: 30
+validation_dataset:
+  path_or_dataset_id: HuggingFaceH4/ultrachat_200k
+  split: test_sft[:16]
+
+wandb:
+  name: ${oc.env:WANDB_NAME,peft-automodel-tiny}

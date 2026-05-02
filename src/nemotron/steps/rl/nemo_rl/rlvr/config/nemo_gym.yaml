@@ -119,7 +119,7 @@ loss_fn:
   use_kl_in_reward: false
 
 policy:
-  model_name: /path/to/sft/checkpoint
+  model_name: ${oc.env:RL_POLICY_MODEL,meta-llama/Llama-3.2-1B-Instruct}
   tokenizer:
     name: ${policy.model_name}
     chat_template_kwargs: null

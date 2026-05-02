@@ -12,28 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Pretrain bin/idx tokenisation. HF-dataset compatible via the blend file.
+defaults: default.yaml
 
-blend_path: /path/to/pretrain_blend.json   # references HF or local datasets
-output_dir: /nemo_run/pretrain-binidx
-num_shards: 128
-valid_shards: 1
-test_shards: 1
-split_seed: 42
-
-tokenizer:
-  model: nvidia/NVIDIA-Nemotron-Nano-9B-v2
-  add_bos: false
-  add_eos: true
-
-dtype: int32
-text_field: text
-min_doc_chars: null
-max_doc_tokens: null
-
-sample: null
-sample_seed: 42
+blend_path: ${oc.env:PWD}/src/nemotron/steps/prep/rl_prep/data/blend_tiny.json
+output_dir: ${oc.env:RL_OUTPUT_DIR,./output/rl-prep-tiny}
+num_shards_per_split: 1
+sample: 64
 force: false
 
 observability:
-  pipeline_logging_interval_s: 30
+  pipeline_logging_interval_s: 5

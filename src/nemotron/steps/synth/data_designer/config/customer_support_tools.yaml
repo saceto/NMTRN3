@@ -20,7 +20,8 @@
 # Each generated conversation includes one assistant tool call, one matching
 # tool response, and a final assistant answer grounded in that tool result.
 
-output_path: ${oc.env:NEMO_RUN_DIR,${oc.env:PWD}/output}/synth/customer_support_tool_sft.jsonl
+output_dir: ${oc.env:SDG_OUTPUT_DIR,${oc.env:NEMO_RUN_DIR,${oc.env:PWD}/output}/synth}
+output_path: ${output_dir}/customer_support_tool_sft.jsonl
 num_records: 1000
 
 seed_dataset:
@@ -30,7 +31,7 @@ seed_dataset:
 
 models:
   - alias: nvidia-text
-    model: nvidia/nemotron-3-nano-30b-a3b
+    model: openai/gpt-oss-20b
     provider: nvidia
     skip_health_check: true
     inference_parameters:

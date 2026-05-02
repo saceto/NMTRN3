@@ -28,15 +28,20 @@ step_scheduler:
   max_steps: 5
 
 checkpoint:
-  checkpoint_dir: ${oc.env:SFT_OUTPUT_DIR,./output/automodel-tiny}/checkpoints
+  checkpoint_dir: ${oc.env:PRETRAIN_OUTPUT_DIR,./output/pretrain-automodel-tiny}/checkpoints
 
 dataset:
-  path_or_dataset_id: HuggingFaceH4/ultrachat_200k
-  split: train_sft[:64]
+  paths: ${oc.env:PRETRAIN_BLEND_PATH,/mnt/lustre-shared/output/functional/prep/pretrain_idxbin/tiny/blend.json}
+  index_mapping_dir: ${oc.env:PRETRAIN_OUTPUT_DIR,./output/pretrain-automodel-tiny}/index_mapping/train
+  seq_length: 1024
+  num_train_samples: 128
+  trainer_max_steps: 5
 
 validation_dataset:
-  path_or_dataset_id: HuggingFaceH4/ultrachat_200k
-  split: test_sft[:16]
+  paths: ${oc.env:PRETRAIN_BLEND_PATH,/mnt/lustre-shared/output/functional/prep/pretrain_idxbin/tiny/blend.json}
+  index_mapping_dir: ${oc.env:PRETRAIN_OUTPUT_DIR,./output/pretrain-automodel-tiny}/index_mapping/validation
+  seq_length: 1024
+  num_val_samples: 16
 
 wandb:
-  name: ${oc.env:WANDB_NAME,sft-automodel-tiny}
+  name: ${oc.env:WANDB_NAME,pretrain-automodel-tiny}

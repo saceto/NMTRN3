@@ -25,6 +25,9 @@
 output_dir: ${oc.env:PRETRAIN_OUTPUT_DIR,./output/pretrain_dataprep_tiny}
 
 num_shards: 4
+valid_shards: 1
+test_shards: 1
+split_seed: 42
 
 tokenizer:
   model: nvidia/NVIDIA-Nemotron-Nano-9B-v2

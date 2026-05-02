@@ -20,10 +20,10 @@ script:
   flag_style: hyphen
 
 args:
-  hf_model_id: nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-BF16
+  hf_model_id: nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-Base-BF16
   trust_remote_code: true
 
-  export_quant_cfg: mamba_moe_nvfp4_conservative
+  export_quant_cfg: nvfp4
   megatron_save_path: ${oc.env:NEMO_RUN_DIR,${oc.env:PWD}/output}/optimize/quantize/super3-nvfp4
 
   tp: 8

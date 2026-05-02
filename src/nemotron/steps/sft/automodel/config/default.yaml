@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Starter config for AutoModel-style SFT.
-# Uses Qwen3.6-35B-A3B as the larger HF model example and points at local chat JSONL.
+# Uses the Qwen3-30B-A3B MoE model and points at local chat JSONL.
 
 recipe: TrainFinetuneRecipeForNextTokenPrediction
 
@@ -35,8 +35,19 @@ rng:
 
 model:
   _target_: nemo_automodel.NeMoAutoModelForCausalLM.from_pretrained
-  pretrained_model_name_or_path: Qwen/Qwen3.6-35B-A3B
+  pretrained_model_name_or_path: Qwen/Qwen3-30B-A3B
   trust_remote_code: true
+  torch_dtype: bfloat16
+  backend:
+    _target_: nemo_automodel.components.models.common.BackendConfig
+    attn: te
+    linear: torch
+    rms_norm: torch_fp32
+    experts: torch_mm
+    dispatcher: torch
+    fake_balanced_gate: false
+    enable_hf_state_dict_adapter: true
+    enable_fsdp_optimizations: true
 
 checkpoint:
   enabled: true
@@ -45,11 +56,14 @@ checkpoint:
   save_consolidated: true
 
 distributed:
-  strategy: fsdp2
+  _target_: nemo_automodel.components.distributed.config.FSDP2Config
   dp_size: none
   tp_size: 1
   cp_size: 1
+  pp_size: 1
+  ep_size: 8
   sequence_parallel: false
+  activation_checkpointing: false
 
 peft:
   _target_: nemo_automodel.components._peft.lora.PeftConfig
