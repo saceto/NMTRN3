@@ -145,10 +145,10 @@ deployment-guides.md
 :caption: Training Recipes
 :hidden:
 
-nemotron/nano3/README.md
-nemotron/omni3/README.md
-nemotron/super3/README.md
-nemotron/embed/README.md
+Nemotron 3 Nano <nemotron/nano3/README.md>
+Nemotron 3 Omni <nemotron/omni3/README.md>
+Nemotron 3 Super <nemotron/super3/README.md>
+Llama Nemotron Embed <nemotron/embed/README.md>
 nemotron/artifacts.md
 ```
 

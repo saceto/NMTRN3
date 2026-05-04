@@ -262,3 +262,17 @@ wandb login
 - [NVIDIA AI Stack](../nvidia-stack.md)
 - [Execution through NeMo-Run](../../nemo_runspec/nemo-run.md)
 - [Data Preparation Module](../data-prep.md)
+
+```{toctree}
+:hidden:
+
+pretrain.md
+sft.md
+rl/index.md
+rl/rlvr.md
+rl/swe.md
+rl/rlhf.md
+rl/data-prep.md
+evaluate.md
+quantization.md
+```
