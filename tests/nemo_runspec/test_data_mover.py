@@ -162,7 +162,8 @@ def test_plan_for_lepton_chunks_source_into_env_vars(tmp_path, monkeypatch):
         repo_root=tmp_path,
     )
     assert isinstance(plan, Plan)
-    assert plan.pod_src_root == "/mnt/foo/_nemotron/src"
+    assert plan.pod_src_root.startswith("/mnt/foo/_nemotron/src-")
+    assert plan.source_ready_marker == f"{plan.pod_src_root}/.nemotron-src-ready"
     # Env vars populated with chunk count + at least one chunk.
     n = int(env_vars["_NEMOTRON_SRC_CHUNKS"])
     assert n >= 1
@@ -203,6 +204,7 @@ def test_plan_for_cloud_ready_marker_is_unique_per_submission(tmp_path, monkeypa
     assert env_a["_NEMOTRON_SRC_SHA256"] == env_b["_NEMOTRON_SRC_SHA256"]
     assert ".nemotron-src-ready-${_NEMOTRON_SRC_CHUNKS}" not in plan_a.pre_script_cmds[0]
     assert plan_a.source_ready_marker != plan_b.source_ready_marker
+    assert plan_a.pod_src_root != plan_b.pod_src_root
     assert plan_a.pre_script_cmds[0] != plan_b.pre_script_cmds[0]
 
 
@@ -225,7 +227,7 @@ def test_plan_for_dgxcloud_chunks_source_into_env_vars(tmp_path, monkeypatch):
         pod_nemotron_home="/workspace/_nemotron",
         repo_root=tmp_path,
     )
-    assert plan.pod_src_root == "/workspace/_nemotron/src"
+    assert plan.pod_src_root.startswith("/workspace/_nemotron/src-")
     # Env vars populated, no file-based PVC path.
     assert int(env_vars["_NEMOTRON_SRC_CHUNKS"]) >= 1
     assert "_NEMOTRON_SRC_CHUNK_0" in env_vars

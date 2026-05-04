@@ -1020,19 +1020,24 @@ def _derive_cloud_workspace(env: Any) -> str:
 
 
 def _transport_env_cleanup_cmd() -> str:
-    """Drop one-shot source/config transport vars before spawning user code.
+    """Mask one-shot source/config transport vars before spawning user code.
 
     NeMo-RL calls ``ray.init(runtime_env={"env_vars": dict(os.environ)})``.
     Keeping base64 source/config payloads in ``os.environ`` makes every Ray
     worker inherit large transient vars, which can kill worker startup on
     Lepton Ray clusters. The files have already been decoded by this point.
+
+    Do not simply ``unset`` these keys. The RayCluster pods/raylets were
+    created with the transport variables, so later workers inherit those base
+    values unless the driver's runtime_env explicitly overrides them. Exporting
+    empty values keeps the runtime_env tiny while masking the inherited payloads.
     """
     return (
         'if [ -n "${_NEMOTRON_SRC_CHUNKS:-}" ]; then '
         'i=0; while [ "$i" -lt "${_NEMOTRON_SRC_CHUNKS}" ]; do '
-        'unset "_NEMOTRON_SRC_CHUNK_${i}"; i=$((i+1)); '
-        "done; fi; "
-        "unset _NEMOTRON_SRC_CHUNKS _NEMOTRON_SRC_SHA256 _NEMOTRON_CONFIG_B64"
+        'export "_NEMOTRON_SRC_CHUNK_${i}="; i=$((i+1)); '
+        "done; export _NEMOTRON_SRC_CHUNKS=0; fi; "
+        "export _NEMOTRON_SRC_SHA256= _NEMOTRON_CONFIG_B64="
     )
 
 
@@ -1224,6 +1229,11 @@ def execute_cloud(
     ]
     # Per-transport extraction (env-var chunks, job_dir tarball, or nothing).
     parts.extend(transport.pre_script_cmds)
+    if transport.pod_src_root != "/nemo_run/code/src":
+        # Configs are normalized to /nemo_run/code/... before submission. The
+        # cloud chunk transport stages source elsewhere, so keep that legacy
+        # path valid for packaged data files referenced from YAML.
+        parts.append(f"mkdir -p /nemo_run/code && rm -rf /nemo_run/code/src && ln -s {transport.pod_src_root} /nemo_run/code/src")
     parts.append(_transport_env_cleanup_cmd())
     # Extra pip packages from env.toml (CLI deps, experimental libs, etc.)
     for pkg in pip_extras:
@@ -1365,6 +1375,12 @@ def execute_cloud_ray(
     ]
     if transport.source_ready_marker:
         head_setup.append(_ray_node_source_sync_cmd(transport.pod_src_root, transport.source_ready_marker))
+    if transport.pod_src_root != "/nemo_run/code/src":
+        # Keep rewritten /nemo_run/code/... config paths valid when source was
+        # delivered through the cloud chunk transport.
+        head_setup.append(
+            f"mkdir -p /nemo_run/code && rm -rf /nemo_run/code/src && ln -s {transport.pod_src_root} /nemo_run/code/src"
+        )
     head_setup.append(_transport_env_cleanup_cmd())
     if transport.needs_pwd_symlinks:
         # Native-packager path: source sits at /nemo_run/code/src; symlink it
@@ -1471,20 +1487,94 @@ def execute_cloud_ray(
     typer.echo(f"[ray] submission_id={getattr(ray_job, 'submission_id', None)}")
 
     if attached:
-        # Retry log streaming on transient disconnects (Ray dashboard/WebSocket
-        # can drop mid-stream during heavy log bursts like vLLM compile).
-        while True:
-            try:
-                ray_job.logs(follow=True)
-                break
-            except KeyboardInterrupt:
-                typer.echo("\n[info] Detaching. Job continues running.")
-                raise typer.Exit(0)
-            except Exception as e:  # noqa: BLE001
-                typer.echo(f"[ray] log stream dropped ({type(e).__name__}: {e}); reconnecting...")
-                import time as _time
+        try:
+            final_state = _wait_for_ray_job(ray_job)
+            _write_ray_job_logs(ray_job, os.environ.get("NEMOTRON_RAY_LOG_PATH"))
+        except KeyboardInterrupt:
+            typer.echo("\n[info] Detaching. Job continues running.")
+            raise typer.Exit(0) from None
+        finally:
+            if cluster is not None:
+                typer.echo(f"[ray] stopping RayCluster {cluster_name} (suspend, keep resource)...")
+                try:
+                    if executor_type == "lepton":
+                        _suspend_lepton_ray_cluster(cluster_name)
+                    else:
+                        cluster.stop()
+                except Exception as exc:  # noqa: BLE001
+                    typer.echo(
+                        f"[ray] failed to stop RayCluster {cluster_name} "
+                        f"({type(exc).__name__}: {exc})"
+                    )
+        if final_state in {"FAILED", "STOPPED", "CANCELLED", "TIMEOUT", "NOT_FOUND"}:
+            raise RuntimeError(f"Ray job {job_name} ended in {final_state}")
 
-                _time.sleep(5)
+
+def _wait_for_ray_job(ray_job: Any, *, poll_seconds: int = 30) -> str:
+    """Wait for a RayJob without streaming its logs to the submit terminal."""
+    import time
+
+    terminal_states = {
+        "SUCCEEDED",
+        "COMPLETED",
+        "FAILED",
+        "STOPPED",
+        "CANCELLED",
+        "TIMEOUT",
+        "NOT_FOUND",
+    }
+    last_state: str | None = None
+    while True:
+        state = _ray_job_status_state(ray_job.status(display=False))
+        if state != last_state:
+            typer.echo(f"[ray] state={state}")
+            last_state = state
+        if state in terminal_states:
+            return state
+        time.sleep(poll_seconds)
+
+
+def _ray_job_status_state(status: Any) -> str:
+    """Normalize nemo-run Ray status return shapes."""
+    if isinstance(status, dict):
+        return str(
+            status.get("state")
+            or status.get("status")
+            or status.get("job_status")
+            or "UNKNOWN"
+        )
+    return str(getattr(status, "value", status))
+
+
+def _write_ray_job_logs(ray_job: Any, log_path: str | None) -> None:
+    """Persist Ray job logs for report artifacts without printing them."""
+    if not log_path:
+        return
+    try:
+        submission_id = getattr(ray_job, "submission_id", None) or getattr(
+            ray_job.backend,
+            "submission_id",
+            None,
+        )
+        if not submission_id:
+            return
+        logs = ray_job.backend._ray_client().get_job_logs(submission_id)
+        path = Path(log_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(logs, encoding="utf-8")
+        typer.echo(f"[ray] logs={path}")
+    except Exception as exc:  # noqa: BLE001
+        typer.echo(f"[ray] failed to save logs ({type(exc).__name__}: {exc})")
+
+
+def _suspend_lepton_ray_cluster(cluster_name: str) -> None:
+    """Suspend a Lepton RayCluster without deleting its API object."""
+    from leptonai.api.v2.client import APIClient
+
+    client = APIClient()
+    # The SDK update helper currently validates only worker min_replicas
+    # updates, but the API accepts a merge patch for spec.suspend.
+    client.raycluster._patch(f"/rayclusters/{cluster_name}", json={"spec": {"suspend": True}})
 
 
 # =============================================================================

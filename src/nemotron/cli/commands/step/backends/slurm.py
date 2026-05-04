@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import shlex
+import time
 
 import typer
 
@@ -120,7 +121,9 @@ class SlurmBackend:
         ray_job = RayJob(name=ctx.job_name, executor=executor)
         ray_job.start(command=cmd, workdir="")
         if ctx.attached:
-            ray_job.logs(follow=True)
+            final_state = self._wait_for_ray_job(ray_job)
+            if final_state in {"FAILED", "STOPPED", "CANCELLED", "TIMEOUT", "NOT_FOUND"}:
+                raise RuntimeError(f"Ray job {ctx.job_name} ended in {final_state}")
 
     @staticmethod
     def _build_cmd(ctx: JobContext) -> str:
@@ -144,6 +147,40 @@ class SlurmBackend:
     def _uses_code_packager(ctx: JobContext) -> bool:
         """Prep steps start Ray internally, so workers need importable modules."""
         return ctx.step_id.startswith("prep/")
+
+    @staticmethod
+    def _wait_for_ray_job(ray_job: object, *, poll_seconds: int = 30) -> str:
+        """Wait for Slurm Ray without tailing remote logs to the submit terminal."""
+        terminal_states = {
+            "SUCCEEDED",
+            "COMPLETED",
+            "FAILED",
+            "STOPPED",
+            "CANCELLED",
+            "TIMEOUT",
+            "NOT_FOUND",
+        }
+        last_state: str | None = None
+        while True:
+            status = ray_job.status(display=False)  # type: ignore[attr-defined]
+            state = SlurmBackend._ray_status_state(status)
+            if state != last_state:
+                typer.echo(f"[ray] state={state}")
+                last_state = state
+            if state in terminal_states:
+                return state
+            time.sleep(poll_seconds)
+
+    @staticmethod
+    def _ray_status_state(status: object) -> str:
+        if isinstance(status, dict):
+            return str(
+                status.get("state")
+                or status.get("status")
+                or status.get("job_status")
+                or "UNKNOWN"
+            )
+        return str(getattr(status, "value", status))
 
 
 # Public alias so the registry can import a Backend, not the module.

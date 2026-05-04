@@ -40,6 +40,8 @@ from nemo_runspec.execution import (
     _ray_node_source_sync_cmd,
     _to_plain,
     _transport_env_cleanup_cmd,
+    _wait_for_ray_job,
+    _write_ray_job_logs,
     build_env_vars,
     create_executor,
     get_executor_type,
@@ -140,6 +142,34 @@ class TestRayNodeSourceSync:
 
     def test_sync_command_is_noop_without_marker(self):
         assert _ray_node_source_sync_cmd("/mnt/work/_nemotron/src", None) == "true"
+
+
+class TestRayJobStatusAndLogs:
+    def test_wait_for_ray_job_accepts_dict_status(self):
+        class FakeRayJob:
+            def status(self, *, display: bool = False):  # noqa: ARG002
+                return {"state": "SUCCEEDED"}
+
+        assert _wait_for_ray_job(FakeRayJob(), poll_seconds=0) == "SUCCEEDED"
+
+    def test_write_ray_job_logs_creates_parent_directory(self, tmp_path):
+        class FakeClient:
+            def get_job_logs(self, submission_id: str) -> str:
+                assert submission_id == "sub-123"
+                return "hello from ray\n"
+
+        class FakeBackend:
+            def _ray_client(self):
+                return FakeClient()
+
+        class FakeRayJob:
+            submission_id = "sub-123"
+            backend = FakeBackend()
+
+        log_path = tmp_path / "reports" / "ray.log"
+        _write_ray_job_logs(FakeRayJob(), str(log_path))
+
+        assert log_path.read_text(encoding="utf-8") == "hello from ray\n"
 
 
 # ---------------------------------------------------------------------------

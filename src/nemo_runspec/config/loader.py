@@ -110,7 +110,47 @@ def load_config(config_path: Path) -> DictConfig:
     # Register resolvers before loading config (safe to call multiple times)
     register_auto_mount_resolver()
 
-    return OmegaConf.load(config_path)
+    config = OmegaConf.load(config_path)
+    base_paths = _base_config_paths(config, config_path)
+    if not base_paths:
+        return config
+
+    merged = OmegaConf.create()
+    for base_path in base_paths:
+        merged = OmegaConf.merge(merged, load_config(base_path))
+    override = OmegaConf.create(OmegaConf.to_container(config, resolve=False))
+    override.pop("defaults", None)
+    return OmegaConf.merge(merged, override)
+
+
+def _base_config_paths(config: DictConfig, config_path: Path) -> list[Path]:
+    """Resolve simple ``defaults: default.yaml`` style config inheritance."""
+    if "defaults" not in config:
+        return []
+
+    defaults_value = config.get("defaults")
+    if OmegaConf.is_config(defaults_value):
+        raw_defaults = OmegaConf.to_container(defaults_value, resolve=False)
+    else:
+        raw_defaults = defaults_value
+    if isinstance(raw_defaults, str):
+        raw_items = [raw_defaults]
+    elif isinstance(raw_defaults, list) and all(isinstance(item, str) for item in raw_defaults):
+        raw_items = raw_defaults
+    else:
+        return []
+
+    paths: list[Path] = []
+    for item in raw_items:
+        if item == "_self_":
+            continue
+        path = Path(item)
+        if not path.suffix:
+            path = path.with_suffix(".yaml")
+        if not path.is_absolute():
+            path = config_path.parent / path
+        paths.append(path)
+    return paths
 
 
 def apply_dotlist_overrides(config: DictConfig, dotlist: list[str]) -> DictConfig:
@@ -183,9 +223,17 @@ def build_job_config(
     # Merge env profile if provided (overlays config YAML's run.env)
     if env_profile is not None:
         profile_env = OmegaConf.to_container(env_profile, resolve=True)
-        # Config YAML is base, env.toml profile overlays it
-        # Special handling for 'mounts': concatenate lists instead of overwriting
+        # Config YAML is base, env.toml profile overlays it. Keep nested
+        # env_vars from both sides; RL/Ray configs often carry critical runtime
+        # knobs in YAML while the profile only adds site-specific paths.
         merged_env = {**existing_env, **profile_env}
+        if "env_vars" in existing_env and "env_vars" in profile_env:
+            merged_env["env_vars"] = {
+                **(existing_env.get("env_vars") or {}),
+                **(profile_env.get("env_vars") or {}),
+            }
+        elif "env_vars" in existing_env:
+            merged_env["env_vars"] = existing_env["env_vars"]
         if "mounts" in existing_env and "mounts" in profile_env:
             # Combine mounts from both sources (YAML first, then profile)
             merged_env["mounts"] = existing_env["mounts"] + profile_env["mounts"]
@@ -348,5 +396,3 @@ def save_configs(
     OmegaConf.save(train_config, train_path)
 
     return job_path, train_path
-
-

@@ -218,7 +218,6 @@ def plan_for(
     patch_dgxcloud_accept_legacy_kwargs()
 
     root = Path(repo_root or Path(__file__).resolve().parents[2])
-    pod_src = f"{pod_nemotron_home}/src"
     common = {"repo_root": str(root), "script_path": script_path}
 
     # Both Lepton and DGXCloud deliver env vars via the Job spec's structured
@@ -235,6 +234,7 @@ def plan_for(
             raw = Path(SourcePackager(**common).package(None, td, "nemotron-src")).read_bytes()
         source_digest = hashlib.sha256(raw).hexdigest()[:16]
         source_marker_id = f"{source_digest}-{uuid.uuid4().hex[:8]}"
+        pod_src = f"{pod_nemotron_home}/src-{source_marker_id}"
         b64 = base64.b64encode(raw).decode("ascii")
         chunks = [b64[i : i + chunk_bytes] for i in range(0, len(b64), chunk_bytes)]
         env_vars["_NEMOTRON_SRC_CHUNKS"] = str(len(chunks))
@@ -247,13 +247,11 @@ def plan_for(
         )
         import nemo_run as run
 
-        # Multi-pod NFS race: when N pods share the same dest on NFS, each
-        # would otherwise ``rm -rf && tar -xz`` concurrently and clobber each
-        # other. Gate on NODE_RANK: rank-0 extracts and drops a marker; others
-        # wait for it. The marker is unique per submission so stale markers
-        # from prior runs can't mislead waiters.
+        # Multi-pod NFS race: when N pods share a filesystem, use a unique
+        # destination per submission and gate extraction on NODE_RANK. This
+        # avoids clobbering another active run's import tree.
         pod_src_q = shlex.quote(pod_src)
-        ready_marker = f"{pod_src}/.nemotron-src-ready-{source_marker_id}"
+        ready_marker = f"{pod_src}/.nemotron-src-ready"
         ready_marker_q = shlex.quote(ready_marker)
         extract_cmd = (
             "python3 -c 'import os,sys,base64;"
