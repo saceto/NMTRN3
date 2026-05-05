@@ -85,13 +85,21 @@ def main_callback(
 # Import and register recipe groups
 def _register_groups() -> None:
     """Register all recipe groups with the main app."""
+    from nemotron.cli.commands.byob import byob
     from nemotron.cli.commands.nano3 import nano3_app
-    from nemotron.cli.commands.super3 import super3_app
     from nemotron.cli.kit import kit_app
 
     app.add_typer(nano3_app, name="nano3")
-    app.add_typer(super3_app, name="super3")
     app.add_typer(kit_app, name="kit")
+    app.command(name="byob", rich_help_panel="Benchmarking")(byob)
+
+    try:
+        from nemotron.cli.commands.super3 import super3_app
+    except ModuleNotFoundError as exc:
+        if exc.name != "nemotron.cli.commands.super3.data":
+            raise
+    else:
+        app.add_typer(super3_app, name="super3")
 
 
 # Register groups on import
