@@ -269,45 +269,9 @@ Validation:
   step 399 | val_loss 0.0566
 ```
 
-### Live training visualization
+You should see a loss curve similar to this:
 
-Stdout-only loss is hard to follow when warnings interleave the log lines. The
-recipe writes per-step metrics to `<checkpoint_dir>/training.jsonl` and
-`<checkpoint_dir>/validation.jsonl`, which makes live visualization
-straightforward:
-
-- **TensorBoard** — stream the JSONL files into a `SummaryWriter`, then run
-  `tensorboard --logdir <checkpoint_dir>/tb` and open the URL. Re-run the
-  consumer (or wrap it in a `tail -f`-style watcher) to keep the dashboard
-  updated mid-run.
-- **`tqdm` + `matplotlib`** — for a quick spot-check, read the JSONL files and
-  plot `step` vs `loss` for train and val on the same axis. `tqdm` wraps the
-  step loop for a live progress bar without a long-running process.
-
-Representative stdout from an SFT run — model summary at startup, followed
-by the first ten training steps. The same per-step entries also land in
-`training.jsonl` for downstream consumers:
-
-```
-2026-04-08 22:21:54 | INFO | root | Model summary:
-2026-04-08 22:21:54 | INFO | root | --------------------------------
-2026-04-08 22:21:54 | INFO | root | Trainable parameters: 31,570,023,872
-2026-04-08 22:21:54 | INFO | root | Total parameters: 33,013,580,736
-2026-04-08 22:21:54 | INFO | root | Trainable parameters percentage: 95.63%
-2026-04-08 22:21:54 | INFO | root | Param L2 norm: 11028.8175
-2026-04-08 22:21:54 | INFO | root | --------------------------------
-
-2026-04-08 22:23:55 | INFO | root | step 0 | epoch 0 | loss 0.6178 | grad_norm 5.4087 | lr 1.00e-04 | mem 37.29 GiB | tps 353.72(44.22/gpu) | num_label_tokens 2595
-2026-04-08 22:23:56 | INFO | root | step 1 | epoch 0 | loss 0.7362 | grad_norm 10.7803 | lr 1.00e-04 | mem 49.68 GiB | tps 13411.70(1676.46/gpu) | num_label_tokens 1521
-2026-04-08 22:23:57 | INFO | root | step 2 | epoch 0 | loss 0.5342 | grad_norm 8.1202 | lr 1.00e-04 | mem 49.53 GiB | tps 21120.09(2640.01/gpu) | num_label_tokens 1429
-2026-04-08 22:23:58 | INFO | root | step 3 | epoch 0 | loss 0.3182 | grad_norm 10.2710 | lr 1.00e-04 | mem 49.26 GiB | tps 20263.96(2532.99/gpu) | num_label_tokens 1883
-2026-04-08 22:23:58 | INFO | root | step 4 | epoch 0 | loss 0.1952 | grad_norm 5.0952 | lr 1.00e-04 | mem 49.31 GiB | tps 18991.52(2373.94/gpu) | num_label_tokens 1249
-2026-04-08 22:24:00 | INFO | root | step 5 | epoch 0 | loss 0.1662 | grad_norm 2.0036 | lr 1.00e-04 | mem 49.28 GiB | tps 16145.21(2018.15/gpu) | num_label_tokens 1335
-2026-04-08 22:24:00 | INFO | root | step 6 | epoch 0 | loss 0.1379 | grad_norm 2.0296 | lr 1.00e-04 | mem 49.27 GiB | tps 21486.33(2685.79/gpu) | num_label_tokens 1479
-2026-04-08 22:24:01 | INFO | root | step 7 | epoch 0 | loss 0.1359 | grad_norm 1.6628 | lr 1.00e-04 | mem 49.36 GiB | tps 17912.37(2239.05/gpu) | num_label_tokens 1408
-2026-04-08 22:24:02 | INFO | root | step 8 | epoch 0 | loss 0.0933 | grad_norm 1.1933 | lr 1.00e-04 | mem 49.29 GiB | tps 16856.64(2107.08/gpu) | num_label_tokens 1461
-2026-04-08 22:24:03 | INFO | root | step 9 | epoch 0 | loss 0.1376 | grad_norm 1.8574 | lr 1.00e-04 | mem 49.36 GiB | tps 18815.61(2351.95/gpu) | num_label_tokens 1606
-```
+![SFT and LoRA training loss curves on CORD-v2](TODO-loss-curves.png)
 
 ### Checkpoints saved
 
