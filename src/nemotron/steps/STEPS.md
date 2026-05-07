@@ -24,6 +24,7 @@
 
 | Step | Description | Consumes | Produces |
 | --- | --- | --- | --- |
+| [env/airgap](env/airgap/) | Compile airgap locks for selected Nemotron Customizer steps, build the local submitter/runtime image, and produce the remote asset staging contract for disconnected customer environments. | step_workflow, env_toml (optional) | airgap_lock, airgap_runtime_image, airgap_asset_bundle |
 | [env/env_toml](env/env_toml/) | Generate and validate step-linked env profile examples from compact YAML templates for Lepton or Slurm, including inheritance, image overrides, mounts, env-var placeholders, and Ray/RL guardrails. | - | env_toml |
 
 ## eval — Evaluation

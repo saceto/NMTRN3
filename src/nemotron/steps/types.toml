@@ -59,3 +59,18 @@ is_a = ["benchmark_parquet"]
 [translated_mcq_benchmark_parquet]
 description = "Translated multiple-choice BYOB benchmark parquet"
 is_a = ["mcq_benchmark_parquet"]
+
+[step_workflow]
+description = "A selected set of src/nemotron/steps targets and configs to prepare or execute as a workflow"
+
+[airgap_lock]
+description = "YAML lockfile recording runtime, assets, executor profiles, services, manual inputs, and provenance for offline delivery"
+
+[airgap_runtime_image]
+description = "Local submitter/runtime Docker image with repo source, uv, offline wheelhouse, and offline environment defaults"
+
+[airgap_asset_bundle]
+description = "Staging layout for external models, datasets, git repos, URL payloads, and metadata used by offline or remote execution"
+
+[offline_wheelhouse]
+description = "Directory of Python wheels used with --no-index for offline package installation"

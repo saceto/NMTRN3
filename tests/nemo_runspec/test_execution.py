@@ -33,12 +33,15 @@ import pytest
 from omegaconf import OmegaConf
 
 from nemo_runspec.execution import (
+    _cloud_script_path,
     _derive_cloud_workspace,
     _get_env,
     _git_mount_commands,
     _parse_netrc,
-    _cloud_script_path,
     _ray_node_source_sync_cmd,
+    _remote_config_path,
+    _remote_pip_setup_commands,
+    _strip_uv_python_run_for_cloud,
     _to_plain,
     _transport_env_cleanup_cmd,
     _wait_for_ray_job,
@@ -126,6 +129,27 @@ class TestTransportEnvCleanup:
         assert "_NEMOTRON_CONFIG_B64" in cmd
         assert "PYTHONPATH" not in cmd
         assert "HF_TOKEN" not in cmd
+
+
+class TestRemoteConfigPath:
+    def test_remote_config_path_is_stable_and_step_scoped(self):
+        home = "/mnt/lustre-shared/_nemotron"
+        config = b"logger:\n  log_dir: /tmp/logs\n"
+
+        first = _remote_config_path(home, "src/nemotron/steps/rl/nemo_rl/dpo/step.py", config)
+        again = _remote_config_path(home, "src/nemotron/steps/rl/nemo_rl/dpo/step.py", config)
+        other_step = _remote_config_path(home, "src/nemotron/steps/prep/rl_prep/step.py", config)
+        other_config = _remote_config_path(
+            home,
+            "src/nemotron/steps/rl/nemo_rl/dpo/step.py",
+            b"blend_path: /tmp/blend.json\n",
+        )
+
+        assert first == again
+        assert first.startswith(f"{home}/config-")
+        assert first.endswith(".yaml")
+        assert first != other_step
+        assert first != other_config
 
 
 class TestCloudScriptPath:
@@ -766,8 +790,9 @@ class TestGitMountCommands:
         with patch("nemo_runspec.config.resolvers.get_git_mounts", return_value=mounts):
             commands = _git_mount_commands()
         assert len(commands) == 1
+        assert "${NEMOTRON_AIRGAP_REPOS:-/opt/nemotron-airgap/assets/repos}/megatron" in commands[0]
+        assert "cp -a" in commands[0]
         assert "git clone --depth 1 -b main" in commands[0]
-        assert commands[0].startswith("rm -rf /opt/megatron-lm")
         assert "/opt/megatron-lm" in commands[0]
 
     def test_commit_sha_uses_fetch_fallback(self):
@@ -818,6 +843,143 @@ class TestGitMountCommands:
         assert len(commands) == 2
         assert any("/opt/a" in c and "-b main" in c for c in commands)
         assert any("/opt/b" in c and "-b develop" in c for c in commands)
+
+
+# ---------------------------------------------------------------------------
+# Cloud command normalization
+# ---------------------------------------------------------------------------
+
+
+class TestCloudCommandNormalization:
+    def test_strips_uv_extra_wrapper_for_python_script(self):
+        command = "uv run --extra xenna python {script} --config {config}"
+
+        normalized = _strip_uv_python_run_for_cloud(command)
+
+        assert normalized == "python '{script}' --config '{config}'"
+
+    def test_strips_uv_project_options_for_python_module(self):
+        command = "uv run --project /workspace --extra xenna --no-sync python3 -m pkg --config {config}"
+
+        normalized = _strip_uv_python_run_for_cloud(command)
+
+        assert normalized == "python3 -m pkg --config '{config}'"
+
+    def test_strips_uv_no_build_flag_without_swallowing_python(self):
+        command = "uv run --no-build --no-index python {script} --config {config}"
+
+        normalized = _strip_uv_python_run_for_cloud(command)
+
+        assert normalized == "python '{script}' --config '{config}'"
+
+    def test_strips_uv_common_value_options(self):
+        command = "uv run --with ./dist/pkg.whl --python 3.12 python {script} --config {config}"
+
+        normalized = _strip_uv_python_run_for_cloud(command)
+
+        assert normalized == "python '{script}' --config '{config}'"
+
+    def test_keeps_non_python_uv_commands(self):
+        command = "uv run nemotron step list"
+
+        assert _strip_uv_python_run_for_cloud(command) == command
+
+    def test_keeps_unknown_uv_value_option_conservative(self):
+        command = "uv run --unknown-value maybe python {script} --config {config}"
+
+        assert _strip_uv_python_run_for_cloud(command) == command
+
+
+class TestRemotePipSetupCommands:
+    def test_preinstalled_mode_checks_imports(self):
+        commands = _remote_pip_setup_commands(
+            {"pip_install_mode": "preinstalled"},
+            ["cosmos-xenna"],
+            context="lepton job",
+        )
+
+        assert len(commands) == 1
+        assert "cosmos_xenna" in commands[0]
+        assert "lepton job missing Python imports" in commands[0]
+        assert "pip install" not in commands[0]
+
+    def test_offline_wheelhouse_uses_no_index_and_checks_imports(self):
+        commands = _remote_pip_setup_commands(
+            {
+                "pip_install_mode": "offline_wheelhouse",
+                "pip_wheelhouse": "/mnt/wheels",
+                "pip_required_imports": ["cosmos_xenna"],
+            },
+            ["cosmos-xenna"],
+        )
+
+        assert commands[0] == "python -m pip install --no-index --find-links /mnt/wheels cosmos-xenna"
+        assert "cosmos_xenna" in commands[1]
+
+    def test_offline_wheelhouse_can_use_requirements_file(self):
+        commands = _remote_pip_setup_commands(
+            {
+                "pip_install_mode": "offline_wheelhouse",
+                "pip_wheelhouse": "/mnt/wheels",
+                "pip_requirements": "/mnt/requirements-step.txt",
+            },
+            ["cosmos-xenna"],
+        )
+
+        assert commands[0] == (
+            "python -m pip install --no-index --find-links /mnt/wheels "
+            "-r /mnt/requirements-step.txt"
+        )
+
+    def test_offline_wheelhouse_supports_no_deps_and_constraints(self):
+        commands = _remote_pip_setup_commands(
+            {
+                "pip_install_mode": "offline_wheelhouse",
+                "pip_wheelhouse": "/mnt/wheels",
+                "pip_no_deps": True,
+                "pip_constraints": ["/mnt/constraints.txt"],
+                "pip_install_args": ["--disable-pip-version-check"],
+                "pip_required_imports": ["cosmos_xenna"],
+            },
+            ["cosmos-xenna", "obstore", "portpicker", "cattrs"],
+        )
+
+        assert commands[0] == (
+            "python -m pip install --no-index --find-links /mnt/wheels "
+            "--no-deps -c /mnt/constraints.txt --disable-pip-version-check "
+            "cosmos-xenna obstore portpicker cattrs"
+        )
+        assert "cosmos_xenna" in commands[1]
+
+    def test_default_mode_keeps_legacy_best_effort(self):
+        commands = _remote_pip_setup_commands({}, ["pydantic-settings"], context="dev")
+
+        assert len(commands) == 1
+        assert "python -m pip install -q pydantic-settings || echo" in commands[0]
+
+    def test_default_mode_checks_only_explicit_required_imports(self):
+        commands = _remote_pip_setup_commands(
+            {"pip_required_imports": ["pydantic_settings"]},
+            ["pydantic-settings"],
+            context="dev",
+        )
+
+        assert len(commands) == 2
+        assert "pydantic_settings" in commands[1]
+
+    def test_required_imports_without_packages_only_checks(self):
+        commands = _remote_pip_setup_commands(
+            {
+                "pip_install_mode": "offline_wheelhouse",
+                "pip_required_imports": ["cosmos_xenna"],
+            },
+            [],
+            context="lepton job",
+        )
+
+        assert len(commands) == 1
+        assert "pip install" not in commands[0]
+        assert "cosmos_xenna" in commands[0]
 
 
 # ---------------------------------------------------------------------------

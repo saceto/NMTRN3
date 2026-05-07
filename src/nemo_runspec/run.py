@@ -386,3 +386,95 @@ def patch_cloud_data_mover_skip_configs() -> None:
         dgx_mod.DGXCloudExecutor._nemotron_data_mover_patched = True
 
 
+def patch_lepton_launcher_airgap_init() -> None:
+    """Make Lepton's env-init script source configurable for airgap runs.
+
+    nemo-run's stock Lepton launcher downloads
+    ``https://raw.githubusercontent.com/leptonai/scripts/main/lepton_env_to_pytorch.sh``
+    inside every worker pod. That is convenient for connected development but
+    fails the airgap contract. Keep the connected fallback, but first honor:
+
+    * ``NEMOTRON_LEPTON_INIT_SCRIPT``: source this pre-mounted script.
+    * ``/opt/nemotron-airgap/assets/lepton/lepton_env_to_pytorch.sh``: default
+      mounted asset location.
+    * ``NEMOTRON_LEPTON_INIT_MODE=skip``: skip the init when the image/profile
+      already provides the required distributed env.
+    """
+    try:
+        from nemo_run.core.execution import lepton as lep_mod
+    except Exception:
+        return
+
+    cls = lep_mod.LeptonExecutor
+    if getattr(cls, "_nemotron_airgap_init_patched", False):
+        return
+
+    def launch(self, name: str, cmd: list[str]) -> tuple[str, str]:
+        self._validate_mounts()
+        name = name.replace("_", "-").replace(".", "-").lower()
+        if len(name) > 35:
+            lep_mod.logger.warning("length of name exceeds 35 characters. Shortening...")
+            name = name[:34]
+
+        pre_launch_section = ""
+        if self.pre_launch_commands:
+            pre_launch_section = "\n".join(self.pre_launch_commands) + "\n"
+
+        init_section = """
+if [ "${NEMOTRON_LEPTON_INIT_MODE:-}" = "skip" ]; then
+  echo "[lepton] skipping env init because NEMOTRON_LEPTON_INIT_MODE=skip"
+elif [ -n "${NEMOTRON_LEPTON_INIT_SCRIPT:-}" ]; then
+  if [ ! -f "${NEMOTRON_LEPTON_INIT_SCRIPT}" ]; then
+    echo "[lepton] NEMOTRON_LEPTON_INIT_SCRIPT=${NEMOTRON_LEPTON_INIT_SCRIPT} does not exist on the worker." >&2
+    echo "[lepton] Mount the script into the pod or unset the variable to fall back to the bundled/online init." >&2
+    exit 1
+  fi
+  cp "${NEMOTRON_LEPTON_INIT_SCRIPT}" init.sh
+  chmod +x init.sh
+  source init.sh
+elif [ -f /opt/nemotron-airgap/assets/lepton/lepton_env_to_pytorch.sh ]; then
+  cp /opt/nemotron-airgap/assets/lepton/lepton_env_to_pytorch.sh init.sh
+  chmod +x init.sh
+  source init.sh
+elif [ "${NEMOTRON_LEPTON_INIT_MODE:-}" = "offline" ] || [ "${NEMOTRON_AIRGAP:-}" = "1" ]; then
+  echo "[lepton] airgap mode requested but no init script is available." >&2
+  echo "[lepton] Set NEMOTRON_LEPTON_INIT_SCRIPT," >&2
+  echo "[lepton] mount /opt/nemotron-airgap/assets/lepton/lepton_env_to_pytorch.sh," >&2
+  echo "[lepton] or set NEMOTRON_LEPTON_INIT_MODE=skip if the task image" >&2
+  echo "[lepton] already provides the distributed env." >&2
+  exit 1
+else
+  wget -O init.sh https://raw.githubusercontent.com/leptonai/scripts/main/lepton_env_to_pytorch.sh
+  chmod +x init.sh
+  source init.sh
+fi
+"""
+        launch_script = f"""
+{pre_launch_section}{init_section}
+ln -s {self.lepton_job_dir}/ /nemo_run
+cd /nemo_run/code
+{" ".join(cmd)}
+"""
+
+        with open(os.path.join(self.job_dir, "launch_script.sh"), "w+") as f:
+            f.write(launch_script)
+
+        lep_mod.logger.info("Copying experiment directory to remote filesystem")
+        self.move_data()
+
+        lep_mod.logger.info("Creating distributed workload")
+        job = self.create_lepton_job(name)
+        if not job:
+            raise RuntimeError("Failed to create Lepton job")
+
+        job_id = job.metadata.id_
+        if not job_id:
+            raise RuntimeError("Failed to retrieve job information")
+        status = self.status(job_id)
+        if not status:
+            raise RuntimeError("Failed to retrieve job status")
+        return job_id, status
+
+    cls.launch = launch
+    cls._nemotron_airgap_init_patched = True
+

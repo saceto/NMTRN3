@@ -149,6 +149,7 @@ def test_plan_for_lepton_chunks_source_into_env_vars(tmp_path, monkeypatch):
     _write_fake_repo(tmp_path)
     # Skip the nemo-run patch side-effects — not relevant here.
     monkeypatch.setattr("nemo_runspec.run.patch_cloud_data_mover_skip_configs", lambda: None)
+    monkeypatch.setattr("nemo_runspec.run.patch_lepton_launcher_airgap_init", lambda: None)
     monkeypatch.setattr(
         "nemo_runspec.run.patch_dgxcloud_strip_source_chunks_from_exports",
         lambda: None,
@@ -182,6 +183,7 @@ def test_plan_for_lepton_chunks_source_into_env_vars(tmp_path, monkeypatch):
 def test_plan_for_cloud_ready_marker_is_unique_per_submission(tmp_path, monkeypatch):
     _write_fake_repo(tmp_path)
     monkeypatch.setattr("nemo_runspec.run.patch_cloud_data_mover_skip_configs", lambda: None)
+    monkeypatch.setattr("nemo_runspec.run.patch_lepton_launcher_airgap_init", lambda: None)
     monkeypatch.setattr(
         "nemo_runspec.run.patch_dgxcloud_strip_source_chunks_from_exports",
         lambda: None,
@@ -218,6 +220,7 @@ def test_plan_for_dgxcloud_chunks_source_into_env_vars(tmp_path, monkeypatch):
     the launcher file stays small."""
     _write_fake_repo(tmp_path)
     monkeypatch.setattr("nemo_runspec.run.patch_cloud_data_mover_skip_configs", lambda: None)
+    monkeypatch.setattr("nemo_runspec.run.patch_lepton_launcher_airgap_init", lambda: None)
     monkeypatch.setattr(
         "nemo_runspec.run.patch_dgxcloud_strip_source_chunks_from_exports",
         lambda: None,
@@ -240,6 +243,7 @@ def test_plan_for_dgxcloud_chunks_source_into_env_vars(tmp_path, monkeypatch):
 def test_plan_for_fallback_uses_native_packager_path(tmp_path, monkeypatch):
     _write_fake_repo(tmp_path)
     monkeypatch.setattr("nemo_runspec.run.patch_cloud_data_mover_skip_configs", lambda: None)
+    monkeypatch.setattr("nemo_runspec.run.patch_lepton_launcher_airgap_init", lambda: None)
     monkeypatch.setattr(
         "nemo_runspec.run.patch_dgxcloud_strip_source_chunks_from_exports",
         lambda: None,

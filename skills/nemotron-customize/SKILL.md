@@ -40,6 +40,7 @@ Concise. Technical. No fluff.
 | Cross-step constraint (tokenizer lock, eval bookends, ...) | `src/nemotron/steps/patterns/<id>.md` |
 | Artifact compatibility / `is_a` / `convert_to` | [src/nemotron/steps/types.toml](../../src/nemotron/steps/types.toml) |
 | GPU memory / parallelism heuristics | [src/nemotron/steps/hardware.md](../../src/nemotron/steps/hardware.md) |
+| Customer airgap readiness | [src/nemotron/steps/env/airgap/step.toml](../../src/nemotron/steps/env/airgap/step.toml), [deploy/nemotron-customizer/airgap/README.md](../../deploy/nemotron-customizer/airgap/README.md) |
 | Library API extracts for code generation | [context/index.toml](context/index.toml) → `context/<pack>.txt` |
 | Project scaffold rules (CLI, pyproject, README, deploy) | [act/PROJECT.md](act/PROJECT.md) |
 | Per-stage code rules (R1–R5, dry-run, W&B) | [act/STAGE.md](act/STAGE.md) |
@@ -144,6 +145,7 @@ Goal: produce a markdown plan the user reviews before any code is written.
 | 6 | RL warm-starts from SFT; rewards validated before scale. | [patterns/rl-validate-rewards-before-scale.md](../../src/nemotron/steps/patterns/rl-validate-rewards-before-scale.md) |
 | 7 | GPU count ≥ chosen model's `min_gpus` (from `[[models]]` block in each `step.toml`). | step.toml + [hardware.md](../../src/nemotron/steps/hardware.md) |
 | 8 | Sovereign / customization patterns checked: `cpt-data-blend-scoping`, `sft-data-blending`, `multilingual-tokenizer-check`, `data-quality-before-quantity`, `sdg-pipeline-versioning`, `byob-benchmark-design`, `pretrain-token-budget-before-scale`, `sft-small-dataset-prefer-lora`, `convert-checkpoint-safety`. | [patterns/](../../src/nemotron/steps/patterns/) |
+| 9 | If customer airgap is in scope, lock the whole workflow, stage HF/git/assets on persistent storage, make remote pip explicit, and smoke from the submitter image. | [env/airgap](../../src/nemotron/steps/env/airgap/) + [deploy/nemotron-customizer/airgap/README.md](../../deploy/nemotron-customizer/airgap/README.md) |
 
 When a check fails: surface it as a `⚠` warning in the plan and propose a
 fix. When the user can't satisfy it (e.g. hardware), propose alternatives in

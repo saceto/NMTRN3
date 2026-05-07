@@ -1,0 +1,22 @@
+# Docker build context for Nemotron Customizer airgap packaging.
+/.git
+/.venv
+**/__pycache__/
+**/*.pyc
+/.pytest_cache
+/.ruff_cache
+/.mypy_cache
+/.tox
+/.nemo_run
+/deploy/nemotron-customizer/airgap/airgap-bundle/assets
+/deploy/nemotron-customizer/airgap/release
+/wandb
+/outputs
+/output
+/logs
+/checkpoints
+/data
+/downloads
+/dist
+/build
+/*.egg-info

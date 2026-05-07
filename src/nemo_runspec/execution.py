@@ -32,6 +32,7 @@ Commands should show exactly how they build executors and run experiments.
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import logging
 import os
@@ -48,6 +49,12 @@ from nemo_runspec import data_mover
 
 console = Console()
 _log = logging.getLogger(__name__)
+
+# Default airgap wheelhouse path on the worker filesystem. Mirrors
+# ``nemotron.steps.airgap.AIRGAP_CONTAINER_WHEELHOUSE`` and the offline.env
+# bundled into the submitter image. Defined here as a literal to avoid a
+# nemo_runspec-to-nemotron import cycle; the airgap test suite asserts they match.
+DEFAULT_AIRGAP_WHEELHOUSE = "/opt/nemotron-airgap/wheels"
 
 
 # =============================================================================
@@ -244,7 +251,51 @@ def build_env_vars(job_config: Any, env_config: dict | None = None) -> dict[str,
 # =============================================================================
 
 
-def clone_git_repos_via_tunnel(tunnel: Any, remote_job_dir: str) -> list[str]:
+def _resolve_airgap_repos(tunnel: Any, *, env: Any, override: str | None) -> str | None:
+    """Pick the airgap git-cache root to honor for ``auto_mount`` repos.
+
+    Priority order, first hit wins:
+
+    1. Explicit ``override`` argument from the caller.
+    2. ``env.airgap_repos`` on the executor profile.
+    3. ``env.env_vars.NEMOTRON_AIRGAP_REPOS`` on the executor profile.
+    4. ``NEMOTRON_AIRGAP_REPOS`` in the **submitter** shell. This is the
+       legacy path; many airgap clusters only export the variable cluster-side
+       so we fall back to the SSH side last.
+    5. ``NEMOTRON_AIRGAP_REPOS`` visible to the SSH login shell on the cluster
+       (best-effort ``printenv``). Slurm prologues that set it solely on
+       compute nodes will not be picked up here, so prefer paths 2/3.
+    """
+    if override:
+        return str(override).strip() or None
+    if env is not None:
+        direct = _get_env(env, "airgap_repos")
+        if direct:
+            return str(direct).strip() or None
+        env_vars = _get_env(env, "env_vars")
+        if env_vars is not None:
+            plain_env_vars = _to_plain(env_vars)
+            value = plain_env_vars.get("NEMOTRON_AIRGAP_REPOS") if isinstance(plain_env_vars, dict) else None
+            if value:
+                return str(value).strip() or None
+    local = os.environ.get("NEMOTRON_AIRGAP_REPOS")
+    if local:
+        return local.strip() or None
+    try:
+        result = tunnel.run("printenv NEMOTRON_AIRGAP_REPOS", hide=True, warn=True)
+    except Exception:
+        return None
+    remote = (result.stdout or "").strip() if getattr(result, "ok", False) else ""
+    return remote or None
+
+
+def clone_git_repos_via_tunnel(
+    tunnel: Any,
+    remote_job_dir: str,
+    env: Any = None,
+    *,
+    airgap_repos: str | None = None,
+) -> list[str]:
     """Clone git repos on the remote side via SSH tunnel.
 
     This runs during executor setup, before job submission. The cloned repos
@@ -253,6 +304,12 @@ def clone_git_repos_via_tunnel(tunnel: Any, remote_job_dir: str) -> list[str]:
     Args:
         tunnel: Connected SSH tunnel
         remote_job_dir: Remote directory for git cache
+        env: Optional executor profile (OmegaConf or mapping). When provided we
+            read the airgap repo cache root from ``env.airgap_repos`` or
+            ``env.env_vars.NEMOTRON_AIRGAP_REPOS`` so customer airgap clusters
+            can opt-in without exporting anything on the submitter side. This
+            remains positional-or-keyword for compatibility with older callers.
+        airgap_repos: Explicit override; takes precedence over ``env``.
 
     Returns:
         List of container mount strings (e.g., "/path/to/repo:/opt/Target")
@@ -269,12 +326,21 @@ def clone_git_repos_via_tunnel(tunnel: Any, remote_job_dir: str) -> list[str]:
     # Ensure cache directory exists
     tunnel.run(f"mkdir -p {cache_dir}", hide=True)
 
+    resolved_airgap_repos = _resolve_airgap_repos(tunnel, env=env, override=airgap_repos)
+
     for repo_name, repo_info in git_mounts.items():
         url = repo_info["url"]
         ref = repo_info["ref"]
         target = repo_info.get("target", "")
 
         repo_cache = f"{cache_dir}/{repo_name}"
+        if resolved_airgap_repos and target:
+            preseeded_repo = f"{resolved_airgap_repos.rstrip('/')}/{repo_name}"
+            result = tunnel.run(f"test -d {preseeded_repo}/.git && echo exists", hide=True, warn=True)
+            if result.ok and "exists" in result.stdout:
+                typer.echo(f"[auto_mount] Using airgap repo {preseeded_repo}...")
+                mounts.append(f"{preseeded_repo}:{target}")
+                continue
 
         # Clone or update the repo
         typer.echo(f"[auto_mount] Syncing {repo_name}@{ref}...")
@@ -713,7 +779,7 @@ def create_slurm_executor(
             container_image = ensure_squashed_image(
                 tunnel, container_image, remote_job_dir, env_dict, force=force_squash
             )
-        git_mounts = clone_git_repos_via_tunnel(tunnel, remote_job_dir)
+        git_mounts = clone_git_repos_via_tunnel(tunnel, remote_job_dir, env=env)
 
     # Partition selection: attached (--run) vs batch (--batch) can route to
     # different Slurm queues, falling back to a single shared ``partition``.
@@ -953,6 +1019,231 @@ def _create_lepton_executor(
 # =============================================================================
 
 
+_PIP_INSTALL_MODES = {
+    "none",
+    "offline_wheelhouse",
+    "online",
+    "online_best_effort",
+    "preinstalled",
+}
+
+
+def _uv_run_python_index(parts: list[str]) -> int | None:
+    """Return the wrapped Python command index for ``uv run ... python``.
+
+    We only need to normalize recipe-style commands such as
+    ``uv run --extra xenna python {script}``. Unknown options that may take
+    values are left unmodified instead of guessing and accidentally stripping
+    a non-Python ``uv run`` command.
+    """
+    value_options = {
+        "--directory",
+        "--env-file",
+        "--extra",
+        "--group",
+        "--no-extra",
+        "--no-group",
+        "--only-group",
+        "--package",
+        "--project",
+        "--python",
+        "--with",
+        "--with-editable",
+        "--with-requirements",
+        "-p",
+        "-w",
+    }
+    index = 2
+    while index < len(parts):
+        token = parts[index]
+        if token == "--":
+            index += 1
+            return index if index < len(parts) and parts[index] in {"python", "python3"} else None
+        if token in {"python", "python3"}:
+            return index
+        if not token.startswith("-"):
+            return None
+
+        option_name = token.split("=", 1)[0]
+        if option_name in value_options and "=" not in token:
+            index += 2
+        else:
+            index += 1
+    return None
+
+
+def _strip_uv_python_run_for_cloud(command: str) -> str:
+    """Remove project-scoped ``uv run`` wrappers from cloud Python commands.
+
+    Cloud source transport stages only the step source/config into the remote
+    workspace. Dependencies should already be present in the runtime image or
+    installed by executor setup, so commands such as
+    ``uv run --extra xenna python {script}`` would incorrectly require a
+    remote ``pyproject.toml`` and lockfile.
+    """
+    try:
+        parts = shlex.split(command)
+    except ValueError:
+        return command
+
+    if len(parts) < 3 or parts[:2] != ["uv", "run"]:
+        return command
+
+    index = _uv_run_python_index(parts)
+    return shlex.join(parts[index:]) if index is not None else command
+
+
+def _pip_package_to_import_name(package: str) -> str | None:
+    """Best-effort import name for simple package requirements."""
+    token = package.strip()
+    if not token or token.startswith(("-", ".", "/", "git+", "http://", "https://")):
+        return None
+    if " @ " in token:
+        token = token.split(" @ ", 1)[0]
+    for marker in ("==", ">=", "<=", "~=", "!=", ">", "<", ";"):
+        if marker in token:
+            token = token.split(marker, 1)[0]
+    token = token.split("[", 1)[0].strip()
+    if not token:
+        return None
+    return token.replace("-", "_")
+
+
+def _python_import_check_command(import_names: Iterable[str], *, context: str) -> str | None:
+    modules = sorted({name for name in import_names if name})
+    if not modules:
+        return None
+    code = (
+        "import importlib.util, sys\n"
+        f"mods = {modules!r}\n"
+        "missing = [m for m in mods if importlib.util.find_spec(m) is None]\n"
+        "if missing:\n"
+        f"    raise SystemExit('{context} missing Python imports: ' + ', '.join(missing))\n"
+    )
+    return f"python -c {shlex.quote(code)}"
+
+
+def _pip_extra_install_args(env: Any) -> list[str]:
+    """Return optional pip install flags from an executor profile."""
+    args: list[str] = []
+    pip_no_deps = _get_env(env, "pip_no_deps")
+    if isinstance(pip_no_deps, bool) and pip_no_deps:
+        args.append("--no-deps")
+    elif isinstance(pip_no_deps, str) and pip_no_deps.strip().lower() in {"1", "true", "yes", "on"}:
+        args.append("--no-deps")
+
+    constraints = _get_env(env, "pip_constraints") or []
+    if isinstance(constraints, str):
+        constraints = [constraints]
+    for constraint in _to_plain(constraints):
+        if str(constraint).strip():
+            args.extend(["-c", str(constraint).strip()])
+
+    extra_args = _get_env(env, "pip_install_args") or []
+    if isinstance(extra_args, str):
+        args.extend(shlex.split(extra_args))
+    else:
+        args.extend(str(arg) for arg in _to_plain(extra_args) if str(arg).strip())
+    return args
+
+
+def _remote_pip_setup_commands(
+    env: Any,
+    packages: Iterable[str],
+    *,
+    context: str = "remote runtime",
+) -> list[str]:
+    """Build explicit remote pip setup commands for non-local executors.
+
+    ``pip_install_mode`` controls behavior:
+    - ``preinstalled``: fail fast if required imports are missing.
+    - ``offline_wheelhouse``: install from a mounted wheelhouse only.
+    - ``online``: install from configured/default indexes and fail on error.
+    - ``online_best_effort``: legacy dev behavior; warn but continue on error.
+    - ``none``: emit no setup commands.
+
+    Profiles may set ``pip_no_deps=true``, ``pip_constraints``, or
+    ``pip_install_args`` to keep offline wheelhouse installs from upgrading
+    task-image packages that should remain pinned by the base image. The
+    default remains legacy connected-development behavior:
+    ``online_best_effort``.
+    """
+    package_list = [str(pkg).strip() for pkg in _to_plain(list(packages)) if str(pkg).strip()]
+    mode = str(_get_env(env, "pip_install_mode") or "online_best_effort").lower()
+    if mode not in _PIP_INSTALL_MODES:
+        raise ValueError(
+            f"Unsupported pip_install_mode={mode!r}; expected one of {sorted(_PIP_INSTALL_MODES)}"
+        )
+    if mode == "none":
+        return []
+
+    raw_required_imports = _get_env(env, "pip_required_imports") or _get_env(env, "required_imports") or []
+    required_imports = [
+        str(item).strip()
+        for item in _to_plain(raw_required_imports)
+        if str(item).strip()
+    ]
+    if not package_list and not required_imports:
+        return []
+    if not required_imports and mode != "online_best_effort":
+        required_imports = [
+            import_name
+            for import_name in (_pip_package_to_import_name(package) for package in package_list)
+            if import_name
+        ]
+
+    commands: list[str] = []
+    if mode == "preinstalled":
+        check_cmd = _python_import_check_command(required_imports, context=context)
+        return [check_cmd] if check_cmd else []
+
+    extra_install_args = _pip_extra_install_args(env)
+    requirements = _get_env(env, "pip_requirements")
+    if mode == "offline_wheelhouse":
+        # Default mirrors ``nemotron.steps.airgap.AIRGAP_CONTAINER_WHEELHOUSE``
+        # and the OFFLINE_ENV defaults baked into the airgap submitter image
+        # (PIP_FIND_LINKS / UV_FIND_LINKS). Keep them in sync if you change one.
+        wheelhouse = str(_get_env(env, "pip_wheelhouse") or DEFAULT_AIRGAP_WHEELHOUSE)
+        install_parts = [
+            "python",
+            "-m",
+            "pip",
+            "install",
+            "--no-index",
+            "--find-links",
+            wheelhouse,
+        ]
+        install_parts.extend(extra_install_args)
+        if requirements:
+            install_parts.extend(["-r", str(requirements)])
+        elif package_list:
+            install_parts.extend(package_list)
+        else:
+            install_parts = []
+        if install_parts:
+            commands.append(shlex.join(install_parts))
+    elif mode == "online" and package_list:
+        commands.append(shlex.join(["python", "-m", "pip", "install", *extra_install_args, *package_list]))
+    elif mode == "online_best_effort" and package_list:
+        install_cmd = shlex.join(["python", "-m", "pip", "install", "-q", *extra_install_args, *package_list])
+        commands.append(
+            f"{install_cmd} || echo '[pip] WARNING: online install failed for {context}; checking imports next'"
+        )
+
+    check_cmd = _python_import_check_command(required_imports, context=context)
+    if check_cmd:
+        commands.append(check_cmd)
+    return commands
+
+
+# Public aliases so other backends (Slurm, custom recipes) can build the
+# same airgap-aware pip setup without depending on private names. The
+# underscore variants stay as in-module callsites we don't want to churn.
+build_remote_pip_setup = _remote_pip_setup_commands
+get_env_value = _get_env
+to_plain = _to_plain
+
+
 def _git_mount_commands() -> list[str]:
     """Convert registered auto_mount git repos to shell clone commands.
 
@@ -981,15 +1272,21 @@ def _git_mount_commands() -> list[str]:
             # For specific commits: try shallow fetch, but don't delete the
             # existing target if fetch fails (keeps container's built-in version).
             # GitHub often blocks fetching arbitrary SHAs with --depth 1.
+            preseeded = f"${{NEMOTRON_AIRGAP_REPOS:-/opt/nemotron-airgap/assets/repos}}/{repo_name}"
             commands.append(
-                f"(git init /tmp/_git_{repo_name} && git -C /tmp/_git_{repo_name} remote add origin {url}"
+                f"(if [ -d {preseeded}/.git ]; then rm -rf {target} && cp -a {preseeded} {target}; "
+                f"else git init /tmp/_git_{repo_name} && git -C /tmp/_git_{repo_name} remote add origin {url}"
                 f" && git -C /tmp/_git_{repo_name} fetch --depth 1 origin {ref}"
                 f" && git -C /tmp/_git_{repo_name} checkout FETCH_HEAD"
-                f" && rm -rf {target} && mv /tmp/_git_{repo_name} {target})"
+                f" && rm -rf {target} && mv /tmp/_git_{repo_name} {target}; fi)"
                 f" || echo '[auto_mount] WARNING: Could not fetch {ref[:12]}, using container built-in {target}'"
             )
         else:
-            commands.append(f"rm -rf {target} && git clone --depth 1 -b {ref} {url} {target}")
+            preseeded = f"${{NEMOTRON_AIRGAP_REPOS:-/opt/nemotron-airgap/assets/repos}}/{repo_name}"
+            commands.append(
+                f"if [ -d {preseeded}/.git ]; then rm -rf {target} && cp -a {preseeded} {target}; "
+                f"else rm -rf {target} && git clone --depth 1 -b {ref} {url} {target}; fi"
+            )
     return commands
 
 
@@ -1041,6 +1338,15 @@ def _transport_env_cleanup_cmd() -> str:
         "done; export _NEMOTRON_SRC_CHUNKS=0; fi; "
         "export _NEMOTRON_SRC_SHA256= _NEMOTRON_CONFIG_B64="
     )
+
+
+def _remote_config_path(nemotron_home: str, script_path: str, config_bytes: bytes) -> str:
+    """Return a stable remote config path that cannot collide across steps."""
+    digest = hashlib.sha256()
+    digest.update(script_path.encode("utf-8"))
+    digest.update(b"\0")
+    digest.update(config_bytes)
+    return f"{nemotron_home}/config-{digest.hexdigest()[:16]}.yaml"
 
 
 def _cloud_script_path(script_path: str, pod_src_root: str) -> str:
@@ -1172,10 +1478,11 @@ def execute_cloud(
     How it works:
     1. ``data_mover`` stages local source through executor-appropriate transport.
     2. Config YAML is passed as a base64 env var and decoded into the workspace.
-    3. Extra packages from ``pip_extras`` are installed (CLI deps, etc.).
+    3. Extra packages from ``pip_extras`` are handled according to
+       ``pip_install_mode`` (preinstalled, offline wheelhouse, or online dev).
     4. ``PYTHONPATH`` points at the staged source root.
-    5. ``PWD`` is set to ``{workspace}/_nemotron`` so configs using
-       (``${oc.env:PWD}/../output/...``) land on persistent storage.
+    5. ``PWD`` is set to ``{workspace}/_nemotron`` while file-based script
+       paths are rewritten to the pod-local ``/nemo_run/code/src`` alias.
     """
     import base64
 
@@ -1186,10 +1493,10 @@ def execute_cloud(
     # ── 1. Workspace & paths ─────────────────────────────────────────
     workspace = _derive_cloud_workspace(env)
     nemotron_home = f"{workspace}/_nemotron"
-    config_path = f"{nemotron_home}/config.yaml"
 
     # ── 2. Config + source transport ────────────────────────────────
-    env_vars["_NEMOTRON_CONFIG_B64"] = base64.b64encode(train_path.read_bytes()).decode("ascii")
+    config_bytes = train_path.read_bytes()
+    env_vars["_NEMOTRON_CONFIG_B64"] = base64.b64encode(config_bytes).decode("ascii")
     transport = data_mover.plan_for(
         executor_type=executor_type or "",
         env_vars=env_vars,
@@ -1197,6 +1504,7 @@ def execute_cloud(
         pod_nemotron_home=nemotron_home,
         repo_root=_get_env(env, "repo_root"),
     )
+    config_path = _remote_config_path(nemotron_home, script_path, config_bytes)
 
     # ── 3. Executor ──────────────────────────────────────────────────
     if executor_type == "lepton":
@@ -1234,7 +1542,7 @@ def execute_cloud(
         )
     else:
         default_cmd = f"python -m {module_path} --config {{config}}"
-    effective_cmd = run_command or _get_env(env, "run_command") or default_cmd
+    effective_cmd = _strip_uv_python_run_for_cloud(run_command or _get_env(env, "run_command") or default_cmd)
     script_cmd = effective_cmd.format(
         script=_cloud_script_path(script_path, transport.pod_src_root),
         config=config_path,
@@ -1259,9 +1567,10 @@ def execute_cloud(
             f"ln -s {transport.pod_src_root} /nemo_run/code/src"
         )
     parts.append(_transport_env_cleanup_cmd())
-    # Extra pip packages from env.toml (CLI deps, experimental libs, etc.)
-    for pkg in pip_extras:
-        parts.append(f"pip install -q {pkg} 2>/dev/null || true")
+    # Extra pip packages from env.toml (CLI deps, experimental libs, etc.).
+    # Airgap profiles should use pip_install_mode=preinstalled or
+    # pip_install_mode=offline_wheelhouse.
+    parts.extend(_remote_pip_setup_commands(env, pip_extras, context=f"{executor_type} job"))
     # Clone auto_mount git repos (Megatron-LM, Megatron-Bridge, etc.)
     # On Slurm these are bind-mounted; on cloud we clone inside the container.
     parts.extend(_git_mount_commands())
@@ -1350,9 +1659,9 @@ def execute_cloud_ray(
 
     workspace = _derive_cloud_workspace(env)
     nemotron_home = f"{workspace}/_nemotron"
-    config_path = f"{nemotron_home}/config.yaml"
 
-    env_vars["_NEMOTRON_CONFIG_B64"] = base64.b64encode(train_path.read_bytes()).decode("ascii")
+    config_bytes = train_path.read_bytes()
+    env_vars["_NEMOTRON_CONFIG_B64"] = base64.b64encode(config_bytes).decode("ascii")
 
     # Same source-transport strategy selection as the non-Ray path.
     transport = data_mover.plan_for(
@@ -1362,6 +1671,7 @@ def execute_cloud_ray(
         pod_nemotron_home=nemotron_home,
         repo_root=_get_env(env, "repo_root"),
     )
+    config_path = _remote_config_path(nemotron_home, script_path, config_bytes)
     # Make source importable on every pod (head + workers) without a per-pod
     # install step; Ray actors inherit this via env_vars.
     env_vars["PYTHONPATH"] = transport.pod_src_root + ":" + env_vars.get("PYTHONPATH", "")
@@ -1377,8 +1687,7 @@ def execute_cloud_ray(
     # Per-pod setup (runs BEFORE ray start). The transport's extraction
     # commands run here so workers have source on disk before Ray actors start.
     pre_ray_commands: list[str] = list(transport.pre_script_cmds)
-    for pkg in pip_extras:
-        pre_ray_commands.append(f"pip install -q {pkg} 2>/dev/null || true")
+    pre_ray_commands.extend(_remote_pip_setup_commands(env, pip_extras, context=f"{executor_type} Ray worker"))
     pre_ray_commands.extend(_git_mount_commands())
     if setup_commands:
         pre_ray_commands.extend(setup_commands)
@@ -1386,7 +1695,7 @@ def execute_cloud_ray(
     # Head command (runs after Ray cluster is up).
     module_path = script_path.replace("src/", "").replace("/", ".").removesuffix(".py")
     default_cmd = f"python -m {module_path} --config {{config}}"
-    effective_cmd = run_command or _get_env(env, "run_command") or default_cmd
+    effective_cmd = _strip_uv_python_run_for_cloud(run_command or _get_env(env, "run_command") or default_cmd)
     script_cmd = effective_cmd.format(
         script=_cloud_script_path(script_path, transport.pod_src_root),
         config=config_path,
@@ -1394,10 +1703,9 @@ def execute_cloud_ray(
     if passthrough:
         script_cmd += " " + " ".join(passthrough)
 
-    head_pip = ["typer", "rich", "pydantic-settings", "shellingham", *pip_extras]
     head_setup = [
         *transport.pre_script_cmds,
-        f"pip install -q {' '.join(head_pip)} 2>/dev/null || true",
+        *_remote_pip_setup_commands(env, pip_extras, context=f"{executor_type} Ray head"),
         f"export PYTHONPATH={transport.pod_src_root}:${{PYTHONPATH:-}}",
         f"mkdir -p {nemotron_home}",
         f"echo $_NEMOTRON_CONFIG_B64 | base64 -d > {config_path}",
@@ -1412,14 +1720,6 @@ def execute_cloud_ray(
             f"ln -s {transport.pod_src_root} /nemo_run/code/src"
         )
     head_setup.append(_transport_env_cleanup_cmd())
-    if transport.needs_pwd_symlinks:
-        # Native-packager path: source sits at /nemo_run/code/src; symlink it
-        # under nemotron_home/src so ${oc.env:PWD}/src/... still resolves.
-        head_setup.append(
-            f"mkdir -p {nemotron_home}/src"
-            f" && ln -sfn {transport.pod_src_root}/nemotron {nemotron_home}/src/nemotron"
-            f" && ln -sfn {transport.pod_src_root}/nemo_runspec {nemotron_home}/src/nemo_runspec"
-        )
     if startup_commands:
         head_setup.extend(startup_commands)
     full_cmd = " && ".join(

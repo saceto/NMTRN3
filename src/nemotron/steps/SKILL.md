@@ -18,16 +18,17 @@ Use this skill as the entry point for the Nemotron training and optimization ste
 | DPO, RLVR, or RLHF alignment | `rl/SKILL.md` | prompt or preference JSONL, Megatron checkpoints |
 | SFT SDG or RL preference SDG | `sdg/SKILL.md` | `synthetic_jsonl` |
 | Quantization, distillation, pruning | `optimize/SKILL.md` | optimized HF or Megatron checkpoints |
-| Execution profiles and Lepton/Ray env setup | `env/SKILL.md` | `env_toml` |
+| Execution profiles, Lepton/Ray env setup, airgap packaging | `env/SKILL.md` | `env_toml`, `airgap_lock`, `airgap_runtime_image` |
 
 ## Workflow
 
 1. For any Lepton, Slurm, Ray, or other non-local run, create or verify the env profile file first with `env/SKILL.md`. The default lookup is repository-root `env.toml`; generated backend examples use `env.lepton.toml` or `env.slurm.toml` and must be selected with `NEMOTRON_ENV_FILE`.
-2. Read the most specific `SKILL.md` for the requested stage.
-3. Read that step's `step.toml` first to understand the flow: intent, consumed and produced artifacts, important parameters, strategies, failure modes, and upstream references. Treat it as the agent-facing contract before editing configs or step code.
-4. Start from `config/tiny.yaml` for runner validation and `config/default.yaml` for production shape.
-5. Keep artifact formats explicit when chaining steps. Convert only when the next consumer requires a different checkpoint layout.
-6. Validate the smallest realistic path before scaling to cluster resources.
+2. For customer airgap work, start with `env/airgap` and lock the whole selected workflow at once.
+3. Read the most specific `SKILL.md` for the requested stage.
+4. Read that step's `step.toml` first to understand the flow: intent, consumed and produced artifacts, important parameters, strategies, failure modes, and upstream references. Treat it as the agent-facing contract before editing configs or step code.
+5. Start from `config/tiny.yaml` for runner validation and `config/default.yaml` for production shape.
+6. Keep artifact formats explicit when chaining steps. Convert only when the next consumer requires a different checkpoint layout.
+7. Validate the smallest realistic path before scaling to cluster resources.
 
 ## Decision Patterns
 
@@ -46,3 +47,4 @@ Use this skill as the entry point for the Nemotron training and optimization ste
 - Keep env profile files at the repository root for profile lookup, and never blindly regenerate over a user's existing `env.toml`, `env.lepton.toml`, or `env.slurm.toml`.
 - Do not use tiny configs as quality evidence; they only prove that plumbing starts.
 - Prefer existing runners and configs over inventing a new wrapper.
+- For true airgap smoke tests, submit from the built local runtime image while remote workers use mirrored task images and mounted persistent assets.

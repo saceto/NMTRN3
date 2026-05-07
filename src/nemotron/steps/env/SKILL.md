@@ -10,6 +10,8 @@ Use this category for execution-profile setup under `src/nemotron/steps/env/`.
 ## Route
 
 - `env/env_toml`: generate and validate starter env profile examples for Lepton or Slurm.
+- `env/airgap`: lock selected step workflows, build the submitter/runtime image,
+  and stage remote assets for disconnected customer environments.
 
 ## Guardrails
 
@@ -20,3 +22,5 @@ Use this category for execution-profile setup under `src/nemotron/steps/env/`.
 - Keep data-prep step profiles CPU-only unless the step explicitly needs GPUs. Slurm prep profiles should override GPU bases with CPU partitions and `gpus_per_node = 0`; Lepton prep profiles should use a CPU resource shape.
 - Use the NeMo-RL v0.6.0 image for DPO/RLVR/RLHF profiles on Lepton and Slurm. On Lepton, keep `ray_version` on the latest version supported by the workspace rather than blindly matching the upstream NeMo-RL Ray pin.
 - Compile one small run after profile changes and inspect `run.env` before submitting.
+- For airgap profiles, remove online `startup_commands`, make remote pip policy
+  explicit, and smoke from the built submitter image instead of the host shell.

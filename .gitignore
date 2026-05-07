@@ -23,12 +23,12 @@ share/python-wheels/
 MANIFEST
 
 # Virtual environments
-venv/
-env/
-ENV/
-env.bak/
-venv.bak/
-.venv/
+/venv/
+/env/
+/ENV/
+/env.bak/
+/venv.bak/
+/.venv/
 
 # UV lock files in recipe stages are tracked for reproducible builds
 
@@ -72,6 +72,9 @@ outputs/
 logs/
 checkpoints/
 data/
+/deploy/nemotron-customizer/airgap/airgap-bundle/
+/deploy/nemotron-customizer/airgap/release/
+/deploy/nemotron-customizer/airgap/*.lock.yaml
 !src/nemotron/cli/commands/nano3/data/
 !src/nemotron/cli/commands/super3/data/
 !src/nemotron/cli/commands/embed/data/
