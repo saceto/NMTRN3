@@ -47,7 +47,6 @@ from server.vllm_inference import VllmInferenceAgent
 
 # ── Config (from .env) ──────────────────────────────────────────────────────
 
-INFERENCE_PROVIDER = os.getenv("INFERENCE_PROVIDER", "vllm").strip().lower()
 MODEL_FAMILY = os.getenv("MODEL_FAMILY", "nemotron").strip().lower()
 VLLM_API_BASE = os.getenv("VLLM_API_BASE", "http://host.docker.internal:8001/v1")
 VLLM_API_KEY = os.getenv("VLLM_API_KEY", "EMPTY")
@@ -89,9 +88,6 @@ def _active_api_base() -> str:
     return VLLM_API_BASE
 
 
-def _active_api_key_configured() -> bool:
-    return True
-
 # ── State ───────────────────────────────────────────────────────────────────
 
 
@@ -105,10 +101,6 @@ state = _State()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if INFERENCE_PROVIDER != "vllm":
-        logger.error(
-            f"Unsupported INFERENCE_PROVIDER={INFERENCE_PROVIDER!r}; this demo currently supports only 'vllm'."
-        )
     if MODEL_FAMILY not in {"nemotron", "holotron"}:
         logger.error(
             f"Unknown MODEL_FAMILY={MODEL_FAMILY!r}; expected 'nemotron' or 'holotron'."
@@ -116,9 +108,8 @@ async def lifespan(app: FastAPI):
     state.desktop = DesktopClient(host=DESKTOP_HOST, api_port=DESKTOP_API_PORT)
     state.jobs = {}
     logger.info(
-        "nano_omni_demo started (family={}, provider={}, model={}, base={}, thinking={})",
+        "nano_omni_demo started (family={}, model={}, base={}, thinking={})",
         MODEL_FAMILY,
-        INFERENCE_PROVIDER,
         _active_model(),
         _active_api_base(),
         ENABLE_THINKING,
@@ -254,11 +245,9 @@ async def health() -> dict:
     return {
         "status": "ok",
         "desktop": "ready" if desktop_ok else "not_ready",
-        "inference_provider": INFERENCE_PROVIDER,
         "model_family": MODEL_FAMILY,
         "model": _active_model(),
         "api_base": _active_api_base(),
-        "api_key_configured": _active_api_key_configured(),
         "enable_thinking": ENABLE_THINKING,
         "truncate_history_thinking": TRUNCATE_HISTORY_THINKING,
         "model_max_tokens": MODEL_MAX_TOKENS,
@@ -313,11 +302,6 @@ async def env_restart() -> dict:
 
 @app.post("/agent/start")
 async def agent_start(req: StartAgentRequest) -> dict:
-    if INFERENCE_PROVIDER != "vllm":
-        raise HTTPException(
-            500,
-            f"INFERENCE_PROVIDER={INFERENCE_PROVIDER!r} is not supported for this demo yet. Use 'vllm'.",
-        )
     if MODEL_FAMILY not in {"nemotron", "holotron"}:
         raise HTTPException(
             500,

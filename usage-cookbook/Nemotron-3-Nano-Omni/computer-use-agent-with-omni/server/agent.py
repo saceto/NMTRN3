@@ -1,9 +1,8 @@
 """Nemotron-3 Nano Omni prompt, history, and response parser.
 
 This agent observes a desktop environment via screenshots and generates
-executable pyautogui actions to complete automation tasks. The demo currently
-uses local or remote vLLM inference; the hosted NVIDIA Build / NIM path is not
-enabled because its current behavior differs from the local vLLM server.
+executable pyautogui actions to complete automation tasks through an
+OpenAI-compatible vLLM server.
 
 The prompt format matches the Nemotron CUA training specification:
 - System prompt with password injection
@@ -266,7 +265,7 @@ def parse_response(
             terminal = _terminal_status(block)
             if terminal is not None:
                 if executable_blocks:
-                    # Hosted responses can append repeated terminate calls
+                    # Some responses can append repeated terminate calls
                     # after a valid pyautogui action. The first executable
                     # action is the safe one to run for this step.
                     continue
@@ -331,8 +330,8 @@ class NemotronAgent:
     """Desktop automation agent using Nemotron-3 Nano Omni prompt conventions."""
 
     api_key: str
-    api_base: str = "https://integrate.api.nvidia.com/v1"
-    model: str = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
+    api_base: str = "http://host.docker.internal:8001/v1"
+    model: str = "vllm_local"
     max_tokens: int = 20480
     top_p: float = 0.95
     temperature: float = 0.6
@@ -638,8 +637,8 @@ class NemotronAgent:
                 choice = chunk.choices[0]
                 delta = choice.delta
 
-                # Handle reasoning content (thinking tokens). Build API and
-                # local vLLM variants have both used these field names.
+                # Handle reasoning content (thinking tokens). vLLM variants
+                # have used both field names.
                 r_delta = (
                     getattr(delta, "reasoning_content", None)
                     or getattr(delta, "reasoning", None)

@@ -55,7 +55,7 @@ class AgentParserTests(unittest.TestCase):
         self.assertEqual(parsed.action, "Click Chrome.")
         self.assertEqual(parsed.code, "pyautogui.click(960, 540)")
 
-    def test_falls_back_to_reasoning_when_build_api_puts_action_there(self):
+    def test_falls_back_to_reasoning_when_action_is_in_reasoning(self):
         reasoning = (
             "I should click the browser.\n"
             "## Action: Click Chrome.\n"

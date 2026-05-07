@@ -14,7 +14,7 @@ Both models share the same Omni-Nano-v3 backbone and run on the same vLLM TP=2 s
 
 Switch between them with the `MODEL_FAMILY` env var; the FastAPI server picks the right agent class at startup. **Only one vLLM container can serve at a time** on a 2-GPU host — stop the active vLLM and start the sibling for the other model. See [Launch vLLM](#launch-vllm) below.
 
-Inference currently uses an OpenAI-compatible **vLLM** endpoint only. You can run vLLM locally on a GPU machine or point the demo at a remote vLLM server. The hosted build.nvidia.com / NVIDIA Build / NIM path is intentionally disabled for now because current hosted endpoint behavior differs from the local vLLM server and breaks the computer-use agent loop.
+Inference uses an OpenAI-compatible **vLLM** endpoint. You can run vLLM locally on a GPU machine or point the demo at a remote vLLM server.
 
 ```
  Your browser (http://localhost:8000)
@@ -79,7 +79,7 @@ The web UI shows:
 | Requirement | Notes |
 |---|---|
 | Docker + Docker Compose | Desktop or server, any OS |
-| NVIDIA GPU machine or remote vLLM endpoint | Required for the default `INFERENCE_PROVIDER=vllm` path |
+| NVIDIA GPU machine or remote vLLM endpoint | Required for vLLM inference |
 | Hugging Face access | Required if your vLLM server downloads the model from Hugging Face |
 | ~12 GB disk | For the desktop container image and build cache |
 
@@ -132,7 +132,6 @@ curl -sS http://127.0.0.1:8001/v1/models | python3 -m json.tool
 If vLLM runs on another machine, update `.env`:
 
 ```bash
-INFERENCE_PROVIDER=vllm
 VLLM_API_BASE=http://YOUR_VLLM_HOST:8001/v1
 VLLM_API_KEY=EMPTY
 VLLM_MODEL=vllm_local
@@ -175,7 +174,6 @@ docker run -d \
 Then point `.env` at this endpoint and select the matching model family:
 
 ```bash
-INFERENCE_PROVIDER=vllm
 VLLM_API_BASE=http://host.docker.internal:8011/v1
 VLLM_API_KEY=EMPTY
 VLLM_MODEL=holotron_local
@@ -342,7 +340,6 @@ All settings go in `.env` (see `.env.example`):
 
 | Variable | Default | Description |
 |---|---|---|
-| `INFERENCE_PROVIDER` | `vllm` | Must be `vllm`; other values are rejected by the server |
 | `VLLM_API_BASE` | `http://host.docker.internal:8001/v1` | OpenAI-compatible vLLM base URL for Docker Compose |
 | `VLLM_API_KEY` | `EMPTY` | Bearer token for vLLM |
 | `VLLM_MODEL` | `vllm_local` | vLLM served model name (use `holotron_local` for the Holotron container) |
@@ -369,10 +366,6 @@ All settings go in `.env` (see `.env.example`):
 
 The server container mounts `/var/run/docker.sock` so the **Restart** button can restart only the Compose desktop service. Treat Docker socket access as host-level administrative access and expose this demo only in trusted development environments.
 
-## NVIDIA Build / NIM
-
-Hosted build.nvidia.com / NVIDIA Build / NIM inference is not supported by this demo at the moment. The computer-use agent loop is currently validated only against an OpenAI-compatible vLLM server because the hosted endpoint has behavior differences that affect action generation and parsing. Keep `INFERENCE_PROVIDER=vllm`.
-
 ## Project Structure
 
 ```
@@ -396,7 +389,6 @@ computer-use-agent-with-omni/
 │   ├── main.py               # FastAPI app (REST + SSE + VNC proxy); MODEL_FAMILY dispatch
 │   ├── agent.py              # NemotronAgent: ## Action / ## Code prompt + parsing + coord projection
 │   ├── holotron_agent.py     # HolotronAgent: H Company agent-loop (12-tool JSON schema, structured_outputs)
-│   ├── nvinference.py        # Reserved inactive hosted inference path
 │   ├── vllm_inference.py     # vLLM OpenAI-compatible inference path (both families)
 │   ├── agent_runner.py       # Async screenshot→model→action loop (model-family agnostic)
 │   └── desktop_client.py     # HTTP client for the desktop container API
