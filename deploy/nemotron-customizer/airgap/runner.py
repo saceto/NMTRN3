@@ -3,7 +3,7 @@
 
 This file intentionally lives under deploy/nemotron-customizer/airgap instead
 of adding a new step. It is a connected-machine helper that validates requested
-steps, discovers small task-image Python gaps, builds submitter/task images, and
+steps, discovers small execution-image Python gaps, builds launcher/execution images, and
 saves image tarballs.
 """
 
@@ -33,8 +33,8 @@ SRC_ROOT = REPO_ROOT / "src"
 STEP_ROOT = SRC_ROOT / "nemotron" / "steps"
 DEFAULT_OUTPUT_DIR = AIRGAP_DIR / "out"
 UV_VERSION = "0.11.1"
-PROGRESS_STATE = "airgap-progress.yaml"
-COMPLETE_STATE = "airgap-complete.yaml"
+PROGRESS_STATE = "airgap-build-state.yaml"
+COMPLETE_STATE = "airgap-build-complete.yaml"
 LOCAL_PREFIXES = ("nemotron", "nemo_runspec")
 CORE_IMPORTS = {
     "datasets",
@@ -88,7 +88,7 @@ class RepoOverlay:
 
 
 @dataclass
-class TaskGroup:
+class ExecutionGroup:
     name: str
     base_image: str
     tag: str
@@ -133,7 +133,7 @@ def main(argv: list[str] | None = None) -> int:
         cfg = with_workflow_targets(cfg, normalize_target_specs(args.target))
     stages = normalize_stages(args.stage or cfg.get("build_stages") or cfg.get("stages") or [])
     output_dir = resolve_repo_path(Path(cfg.get("paths", {}).get("output_dir", DEFAULT_OUTPUT_DIR)))
-    if "build-task-images" in stages:
+    if "build-execution-images" in stages:
         validate_docker_context_path(output_dir, field="paths.output_dir")
     output_dir.mkdir(parents=True, exist_ok=True)
     run_state = load_or_start_run_state(
@@ -152,7 +152,7 @@ def main(argv: list[str] | None = None) -> int:
 
     expanded_targets: list[Target] = []
     step_infos: dict[str, StepInfo] = {}
-    groups: list[TaskGroup] = []
+    groups: list[ExecutionGroup] = []
     workflow_manifest: dict[str, Any] = {
         "stages": list(workflow.get("stages") or []),
     }
@@ -173,67 +173,78 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[validate] {len(step_infos)} target(s) ok")
         complete_action(run_state, "validate", {"targets": [target.spec for target in expanded_targets]})
 
-    if any(stage in stages for stage in ("discover-task-deps", "build-task-images", "save-images")):
-        groups = task_groups(cfg, output_dir=output_dir, step_infos=step_infos)
-        manifest["task_groups"] = [task_group_manifest(group) for group in groups]
+    if any(stage in stages for stage in ("discover-execution-deps", "build-execution-images", "save-images")):
+        groups = execution_groups(cfg, output_dir=output_dir, step_infos=step_infos)
+        manifest["execution_groups"] = [execution_group_manifest(group) for group in groups]
 
-    if "discover-task-deps" in stages:
-        if action_completed(run_state, "discover-task-deps") and hydrate_discovered_groups(run_state, groups):
-            print("[resume] skipping discover-task-deps; using saved probe results")
+    if "discover-execution-deps" in stages:
+        if action_completed(run_state, "discover-execution-deps") and hydrate_discovered_groups(run_state, groups):
+            print("[resume] skipping discover-execution-deps; using saved probe results")
         else:
-            begin_action(run_state, "discover-task-deps")
+            begin_action(run_state, "discover-execution-deps")
             locked_versions = locked_package_versions(REPO_ROOT / "uv.lock")
             for group in groups:
-                discover_task_deps(group, step_infos=step_infos, locked_versions=locked_versions, execute=args.execute)
+                discover_execution_deps(
+                    group,
+                    step_infos=step_infos,
+                    locked_versions=locked_versions,
+                    execute=args.execute,
+                )
             remember_discovered_groups(run_state, groups)
-            complete_action(run_state, "discover-task-deps", {"groups": [group.name for group in groups]})
-        manifest["task_groups"] = [task_group_manifest(group) for group in groups]
+            complete_action(run_state, "discover-execution-deps", {"groups": [group.name for group in groups]})
+        manifest["execution_groups"] = [execution_group_manifest(group) for group in groups]
 
-    if "build-submitter" in stages:
-        submitter = cfg.get("submitter", {})
-        submitter_tag = str(submitter.get("tag") or "nemotron-customizer-submit-airgap:latest")
-        platform = submitter_platform(submitter)
-        action = "build-submitter"
-        if action_completed(run_state, action) and docker_image_exists(submitter_tag, platform=platform):
-            print(f"[resume] skipping {action}; image exists: {submitter_tag}")
+    if "build-launcher-image" in stages:
+        launcher_image = cfg.get("launcher_image", {})
+        launcher_image_tag = str(launcher_image.get("tag") or "nemotron-customizer-launcher-airgap:latest")
+        platform = launcher_image_platform(launcher_image)
+        action = "build-launcher-image"
+        if action_completed(run_state, action) and docker_image_exists(launcher_image_tag, platform=platform):
+            print(f"[resume] skipping {action}; image exists: {launcher_image_tag}")
         else:
             begin_action(run_state, action)
-            status = build_submitter(submitter, execute=args.execute)
+            status = build_launcher_image(launcher_image, execute=args.execute)
             if status:
                 return status
-            complete_action(run_state, action, {"image": submitter_tag})
-        manifest["submitter"] = submitter_manifest(submitter)
+            complete_action(run_state, action, {"image": launcher_image_tag})
+        manifest["launcher_image"] = launcher_image_manifest(launcher_image)
 
-    if "build-task-images" in stages:
+    if "build-execution-images" in stages:
         clean_stale_group_dirs(output_dir, groups, execute=args.execute)
         for group in groups:
-            action = f"build-task-image:{group.name}"
+            action = f"build-execution-image:{group.name}"
             if action_completed(run_state, action) and docker_image_exists(group.tag, platform=group.platform):
                 print(f"[resume] skipping {action}; image exists: {group.tag}")
             else:
                 begin_action(run_state, action)
-                status = build_task_image(group, output_dir=output_dir, execute=args.execute)
+                status = build_execution_image(group, output_dir=output_dir, execute=args.execute)
                 if status:
                     return status
                 complete_action(run_state, action, {"image": group.tag})
-        manifest["task_groups"] = [task_group_manifest(group) for group in groups]
+        manifest["execution_groups"] = [execution_group_manifest(group) for group in groups]
 
     if "save-images" in stages:
-        submitter = cfg.get("submitter", {})
-        if submitter:
-            output = output_dir / str(submitter.get("tar", "submitter-image.tar"))
-            submitter_tag = str(submitter.get("tag") or "nemotron-customizer-submit-airgap:latest")
-            action = f"save-image:{submitter_tag}"
+        launcher_image = cfg.get("launcher_image", {})
+        if launcher_image:
+            output = output_dir / str(launcher_image.get("tar", "launcher-image.tar"))
+            launcher_image_tag = str(launcher_image.get("tag") or "nemotron-customizer-launcher-airgap:latest")
+            action = f"save-image:{launcher_image_tag}"
             if action_completed(run_state, action) and output.exists():
                 print(f"[resume] skipping {action}; tar exists: {output}")
             else:
                 begin_action(run_state, action)
-                status = save_image(submitter_tag, output, args.execute)
+                status = save_image(launcher_image_tag, output, args.execute)
                 if status:
                     return status
                 complete_action(run_state, action, {"tar": str(output)})
             saved_images.append(
-                saved_image_manifest(submitter_tag, output, execute=args.execute, role="submitter", name="submitter")
+                saved_image_manifest(
+                    launcher_image_tag,
+                    output,
+                    execute=args.execute,
+                    role="launcher",
+                    name="launcher",
+                )
             )
         for group in groups:
             action = f"save-image:{group.tag}"
@@ -246,7 +257,7 @@ def main(argv: list[str] | None = None) -> int:
                     return status
                 complete_action(run_state, action, {"tar": str(group.tar)})
             saved_images.append(
-                saved_image_manifest(group.tag, group.tar, execute=args.execute, role="task", name=group.name)
+                saved_image_manifest(group.tag, group.tar, execute=args.execute, role="execution", name=group.name)
             )
 
     manifest["persistent_assets"] = {
@@ -254,14 +265,14 @@ def main(argv: list[str] | None = None) -> int:
         "mounts_from_configs": collect_mounts(step_infos.values()),
         "baked_repo_overlays": [repo_overlay_manifest(item) for item in collect_repo_overlays(step_infos.values())],
     }
-    manifest["step_images"] = step_image_manifest(groups)
+    manifest["step_execution_images"] = step_execution_image_manifest(groups)
     manifest["saved_images"] = saved_images
     manifest_path = output_dir / "airgap-manifest.yaml"
     manifest_path.write_text(yaml.safe_dump(manifest, sort_keys=False), encoding="utf-8")
     complete_run_state(run_state, manifest_path=manifest_path)
     print(f"[airgap] wrote {manifest_path}")
     if groups:
-        print("[airgap] selected step images:")
+        print("[airgap] selected execution images:")
         for group in groups:
             image = group.selected_image or group.tag
             for step_id in group.steps:
@@ -372,9 +383,9 @@ def run_signature(*, config_path: Path, cfg: Mapping[str, Any], stages: list[str
         "stages": stages,
         "workflow": cfg.get("workflow"),
         "dependencies": cfg.get("dependencies"),
-        "step_images": cfg.get("step_images"),
-        "task_images": cfg.get("task_images"),
-        "submitter": cfg.get("submitter"),
+        "step_execution_images": cfg.get("step_execution_images"),
+        "execution_images": cfg.get("execution_images"),
+        "launcher_image": cfg.get("launcher_image"),
     }
     text = yaml.safe_dump(payload, sort_keys=True)
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
@@ -414,7 +425,7 @@ def action_completed(state: RunState | None, action: str) -> bool:
     return action in (state.data.get("completed_actions") or {})
 
 
-def remember_discovered_groups(state: RunState | None, groups: Iterable[TaskGroup]) -> None:
+def remember_discovered_groups(state: RunState | None, groups: Iterable[ExecutionGroup]) -> None:
     if state is None:
         return
     state.data["discovered_groups"] = {
@@ -429,7 +440,7 @@ def remember_discovered_groups(state: RunState | None, groups: Iterable[TaskGrou
     write_run_state(state)
 
 
-def hydrate_discovered_groups(state: RunState | None, groups: Iterable[TaskGroup]) -> bool:
+def hydrate_discovered_groups(state: RunState | None, groups: Iterable[ExecutionGroup]) -> bool:
     if state is None:
         return False
     saved = state.data.get("discovered_groups") or {}
@@ -463,7 +474,13 @@ def normalize_stages(stages: Iterable[str]) -> list[str]:
             stage = item.strip()
             if stage and stage not in out:
                 out.append(stage)
-    out = out or ["validate", "discover-task-deps", "build-submitter", "build-task-images", "save-images"]
+    out = out or [
+        "validate",
+        "discover-execution-deps",
+        "build-launcher-image",
+        "build-execution-images",
+        "save-images",
+    ]
 
     def ensure_before(required: str, requested: str) -> None:
         if requested not in out or required in out:
@@ -474,17 +491,17 @@ def normalize_stages(stages: Iterable[str]) -> list[str]:
 
     # Apply prerequisite edges from later stages toward earlier stages. Each
     # insertion is idempotent, so a user can ask for any suffix of the pipeline.
-    ensure_before("build-task-images", "save-images")
-    ensure_before("build-submitter", "save-images")
-    ensure_before("discover-task-deps", "build-task-images")
-    ensure_before("validate", "discover-task-deps")
-    ensure_before("validate", "build-task-images")
+    ensure_before("build-execution-images", "save-images")
+    ensure_before("build-launcher-image", "save-images")
+    ensure_before("discover-execution-deps", "build-execution-images")
+    ensure_before("validate", "discover-execution-deps")
+    ensure_before("validate", "build-execution-images")
     ensure_before("validate", "save-images")
     order = {
         "validate": 0,
-        "discover-task-deps": 1,
-        "build-submitter": 2,
-        "build-task-images": 3,
+        "discover-execution-deps": 1,
+        "build-launcher-image": 2,
+        "build-execution-images": 3,
         "save-images": 4,
     }
     out.sort(key=lambda stage: order.get(stage, len(order)))
@@ -492,7 +509,7 @@ def normalize_stages(stages: Iterable[str]) -> list[str]:
 
 
 def stage_needs_targets(stage: str) -> bool:
-    return stage in {"discover-task-deps", "build-task-images", "save-images"}
+    return stage in {"discover-execution-deps", "build-execution-images", "save-images"}
 
 
 def expand_targets(cfg: Mapping[str, Any]) -> list[Target]:
@@ -577,41 +594,41 @@ def read_config_mounts(config_path: Path | None) -> list[Any]:
     return mounts if isinstance(mounts, list) else []
 
 
-def task_groups(
+def execution_groups(
     cfg: Mapping[str, Any],
     *,
     output_dir: Path,
     step_infos: Mapping[str, StepInfo] | None = None,
-) -> list[TaskGroup]:
+) -> list[ExecutionGroup]:
     if not step_infos:
-        raise SystemExit("validate must run before task images can be planned")
-    if not cfg.get("step_images"):
-        raise SystemExit("airgap.yaml must define step_images for the selected workflow stages")
-    return task_groups_from_step_images(cfg, output_dir=output_dir, step_infos=step_infos)
+        raise SystemExit("validate must run before execution images can be planned")
+    if not cfg.get("step_execution_images"):
+        raise SystemExit("airgap.yaml must define step_execution_images for the selected workflow stages")
+    return execution_groups_from_step_execution_images(cfg, output_dir=output_dir, step_infos=step_infos)
 
 
-def task_groups_from_step_images(
+def execution_groups_from_step_execution_images(
     cfg: Mapping[str, Any],
     *,
     output_dir: Path,
     step_infos: Mapping[str, StepInfo],
-) -> list[TaskGroup]:
-    step_images = normalize_step_images(cfg.get("step_images") or {})
-    image_defs = normalize_task_images(cfg.get("task_images") or {})
-    merged: dict[str, TaskGroup] = {}
+) -> list[ExecutionGroup]:
+    step_execution_images = normalize_step_execution_images(cfg.get("step_execution_images") or {})
+    image_defs = normalize_execution_images(cfg.get("execution_images") or {})
+    merged: dict[str, ExecutionGroup] = {}
 
     for step_id in step_infos:
-        image_name = step_images.get(step_id)
+        image_name = step_execution_images.get(step_id)
         if not image_name:
-            raise SystemExit(f"{step_id}: missing step_images entry in airgap.yaml")
+            raise SystemExit(f"{step_id}: missing step_execution_images entry in airgap.yaml")
         image_def = image_defs.get(image_name)
         if image_def is None:
-            raise SystemExit(f"{step_id}: step_images points to unknown task image {image_name!r}")
+            raise SystemExit(f"{step_id}: step_execution_images points to unknown execution image {image_name!r}")
         base = str(image_def.get("base_image") or "").strip()
         if not base:
-            raise SystemExit(f"task_images.{image_name}.base_image is required")
+            raise SystemExit(f"execution_images.{image_name}.base_image is required")
         repo_overlays = getattr(step_infos[step_id], "repo_overlays", [])
-        group_key = task_group_key(base, repo_overlays)
+        group_key = execution_group_key(base, repo_overlays)
         group = merged.get(group_key)
         if group is None:
             suffix = short_hash(
@@ -620,11 +637,11 @@ def task_groups_from_step_images(
                     "repo_overlays": [repo_overlay_manifest(item) for item in repo_overlays],
                 }
             )
-            group = TaskGroup(
+            group = ExecutionGroup(
                 name=f"{image_name}-{suffix}",
                 base_image=base,
                 tag="",
-                tar=output_dir / "task-image.tar",
+                tar=output_dir / "execution-image.tar",
                 steps=[],
                 platform=str(image_def["platform"]) if image_def.get("platform") else None,
                 pip_no_deps=bool(image_def.get("pip_no_deps", True)),
@@ -639,12 +656,12 @@ def task_groups_from_step_images(
             repo_overlays,
         )
     for group in merged.values():
-        finalize_task_group_name(group, image_defs=image_defs, output_dir=output_dir)
+        finalize_execution_group_name(group, image_defs=image_defs, output_dir=output_dir)
     return list(merged.values())
 
 
-def finalize_task_group_name(
-    group: TaskGroup,
+def finalize_execution_group_name(
+    group: ExecutionGroup,
     *,
     image_defs: Mapping[str, Mapping[str, Any]],
     output_dir: Path,
@@ -659,20 +676,20 @@ def finalize_task_group_name(
     if len(names) == 1:
         image_name = names[0]
         image_def = image_defs[image_name]
-        tag = str(image_def.get("tag") or f"nemotron-task-{sanitize(image_name)}:airgap")
-        tar = output_dir / str(image_def.get("tar") or f"task-{sanitize(image_name)}.tar")
+        tag = str(image_def.get("tag") or f"nemotron-execution-{sanitize(image_name)}:airgap")
+        tar = output_dir / str(image_def.get("tar") or f"execution-{sanitize(image_name)}.tar")
         group.name = f"{image_name}-{suffix}"
     else:
         merged_name = "-".join(sanitize(name) for name in names)
         tag = f"nemotron-customizer-{merged_name}-airgap:latest"
-        tar = output_dir / f"task-{merged_name}-image.tar"
+        tar = output_dir / f"execution-{merged_name}-image.tar"
         group.name = f"{merged_name}-{suffix}"
     group.tag = tag_with_suffix(tag, suffix)
     group.tar = tar_with_suffix(tar, suffix)
     group.selected_image = group.tag
 
 
-def task_group_key(base_image: str, repo_overlays: Iterable[RepoOverlay]) -> str:
+def execution_group_key(base_image: str, repo_overlays: Iterable[RepoOverlay]) -> str:
     overlays = sorted(
         (repo_overlay_manifest(item) for item in repo_overlays),
         key=lambda item: (item["target"], item["url"], item["ref"], item["repo"]),
@@ -704,17 +721,17 @@ def tar_with_suffix(path: Path, suffix: str) -> Path:
     return path.with_name(f"{path.stem}-{suffix}{path.suffix}")
 
 
-def normalize_step_images(raw: Mapping[str, Any]) -> dict[str, str]:
+def normalize_step_execution_images(raw: Mapping[str, Any]) -> dict[str, str]:
     out: dict[str, str] = {}
     for step_id, value in raw.items():
         if isinstance(value, str):
             out[str(step_id)] = value
-        elif isinstance(value, Mapping) and value.get("task_image"):
-            out[str(step_id)] = str(value["task_image"])
+        elif isinstance(value, Mapping) and value.get("execution_image"):
+            out[str(step_id)] = str(value["execution_image"])
     return out
 
 
-def normalize_task_images(raw: Any) -> dict[str, Mapping[str, Any]]:
+def normalize_execution_images(raw: Any) -> dict[str, Mapping[str, Any]]:
     if isinstance(raw, Mapping):
         return {str(name): spec for name, spec in raw.items() if isinstance(spec, Mapping)}
     return {}
@@ -755,8 +772,8 @@ def merge_repo_overlays(existing: list[RepoOverlay], incoming: Iterable[RepoOver
     return out
 
 
-def discover_task_deps(
-    group: TaskGroup,
+def discover_execution_deps(
+    group: ExecutionGroup,
     *,
     step_infos: Mapping[str, StepInfo],
     locked_versions: Mapping[str, str],
@@ -845,7 +862,7 @@ def probe_step_modules(
     pip_no_deps: bool,
     platform: str | None = None,
 ) -> list[str]:
-    """Import selected step modules in the task image and discover missing imports.
+    """Import selected step modules in the execution image and discover missing imports.
 
     The loop installs only the packages it has already identified, in an
     ephemeral container, so the final requirements file stays based on actual
@@ -899,7 +916,7 @@ def probe_step_modules(
         if import_name not in missing:
             missing.append(import_name)
         if import_name in CORE_IMPORTS:
-            print(f"[probe] base image is missing core import {import_name!r}; choose a compatible task image")
+            print(f"[probe] base image is missing core import {import_name!r}; choose a compatible execution image")
             return missing
         requirement = requirement_for_import(import_name, locked_versions)
         if requirement in requirements:
@@ -940,15 +957,15 @@ def normalize_package(name: str) -> str:
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
-def build_submitter(submitter: Mapping[str, Any], *, execute: bool) -> int:
-    image = str(submitter.get("tag") or "nemotron-customizer-submit-airgap:latest")
-    base = str(submitter.get("base_image") or "python:3.12-slim")
-    platform = submitter_platform(submitter)
+def build_launcher_image(launcher_image: Mapping[str, Any], *, execute: bool) -> int:
+    image = str(launcher_image.get("tag") or "nemotron-customizer-launcher-airgap:latest")
+    base = str(launcher_image.get("base_image") or "python:3.12-slim")
+    platform = launcher_image_platform(launcher_image)
     cmd = [
         "docker",
         "build",
         "-f",
-        str(AIRGAP_DIR / "Dockerfile.submitter"),
+        str(AIRGAP_DIR / "Dockerfile.launcher"),
         "--build-arg",
         f"BASE_IMAGE={base}",
         "--build-arg",
@@ -964,12 +981,12 @@ def build_submitter(submitter: Mapping[str, Any], *, execute: bool) -> int:
     return run_or_print(cmd, execute)
 
 
-def submitter_platform(submitter: Mapping[str, Any]) -> str | None:
-    return str(submitter["platform"]) if submitter.get("platform") else None
+def launcher_image_platform(launcher_image: Mapping[str, Any]) -> str | None:
+    return str(launcher_image["platform"]) if launcher_image.get("platform") else None
 
 
-def build_task_image(group: TaskGroup, *, output_dir: Path, execute: bool) -> int:
-    group_dir = output_dir / "task-context" / group.name
+def build_execution_image(group: ExecutionGroup, *, output_dir: Path, execute: bool) -> int:
+    group_dir = output_dir / "execution-context" / group.name
     group_dir.mkdir(parents=True, exist_ok=True)
     group.requirements_path = group_dir / f"requirements-{group.name}.txt"
     group.requirements_path.write_text(
@@ -987,11 +1004,11 @@ def build_task_image(group: TaskGroup, *, output_dir: Path, execute: bool) -> in
         "docker",
         "build",
         "-f",
-        str(AIRGAP_DIR / "Dockerfile.task"),
+        str(AIRGAP_DIR / "Dockerfile.execution"),
         "--build-arg",
         f"BASE_IMAGE={group.base_image}",
         "--build-arg",
-        f"TASK_REQUIREMENTS={docker_context_path(group.requirements_path)}",
+        f"EXECUTION_REQUIREMENTS={docker_context_path(group.requirements_path)}",
         "--build-arg",
         f"REPO_OVERLAYS={docker_context_path(group.repo_overlays_path)}",
         "--build-arg",
@@ -1009,7 +1026,7 @@ def build_task_image(group: TaskGroup, *, output_dir: Path, execute: bool) -> in
     return run_or_print(cmd, execute)
 
 
-def prepare_repo_overlays(group: TaskGroup, *, repos_root: Path, execute: bool) -> None:
+def prepare_repo_overlays(group: ExecutionGroup, *, repos_root: Path, execute: bool) -> None:
     repos_root.mkdir(parents=True, exist_ok=True)
     (repos_root / ".keep").touch()
     for overlay in group.repo_overlays:
@@ -1086,9 +1103,9 @@ def run_or_print(cmd: list[str], execute: bool, *, mkdir: Path | None = None) ->
     return subprocess.run(cmd, check=False, cwd=REPO_ROOT).returncode
 
 
-def clean_stale_group_dirs(output_dir: Path, groups: Iterable[TaskGroup], *, execute: bool) -> None:
+def clean_stale_group_dirs(output_dir: Path, groups: Iterable[ExecutionGroup], *, execute: bool) -> None:
     keep = {group.name for group in groups}
-    for relative in ("task-context", "repo-overlays"):
+    for relative in ("execution-context", "repo-overlays"):
         parent = output_dir / relative
         if not parent.exists():
             continue
@@ -1180,7 +1197,7 @@ def step_to_manifest(info: StepInfo) -> dict[str, Any]:
     }
 
 
-def task_group_manifest(group: TaskGroup) -> dict[str, Any]:
+def execution_group_manifest(group: ExecutionGroup) -> dict[str, Any]:
     return {
         "name": group.name,
         "image_names": sorted(group.image_names),
@@ -1201,7 +1218,7 @@ def task_group_manifest(group: TaskGroup) -> dict[str, Any]:
     }
 
 
-def step_image_manifest(groups: Iterable[TaskGroup]) -> dict[str, str]:
+def step_execution_image_manifest(groups: Iterable[ExecutionGroup]) -> dict[str, str]:
     out: dict[str, str] = {}
     for group in groups:
         image = group.selected_image or group.tag
@@ -1210,12 +1227,12 @@ def step_image_manifest(groups: Iterable[TaskGroup]) -> dict[str, str]:
     return out
 
 
-def submitter_manifest(submitter: Mapping[str, Any]) -> dict[str, Any]:
+def launcher_image_manifest(launcher_image: Mapping[str, Any]) -> dict[str, Any]:
     return {
-        "base_image": submitter.get("base_image") or "python:3.12-slim",
-        "platform": submitter.get("platform"),
-        "tag": submitter.get("tag") or "nemotron-customizer-submit-airgap:latest",
-        "tar": submitter.get("tar") or "submitter-image.tar",
+        "base_image": launcher_image.get("base_image") or "python:3.12-slim",
+        "platform": launcher_image.get("platform"),
+        "tag": launcher_image.get("tag") or "nemotron-customizer-launcher-airgap:latest",
+        "tar": launcher_image.get("tar") or "launcher-image.tar",
     }
 
 

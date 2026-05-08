@@ -5,8 +5,8 @@ This folder is scoped only to Nemotron Customizer steps under
 
 The flow is intentionally small:
 
-1. Build one **submitter image** with this repo and `uv.lock`.
-2. Build one or more **task images** by grouping selected workflow stages by base image.
+1. Build one **launcher image** with this repo and `uv.lock`.
+2. Build one or more **execution images** by grouping selected workflow stages by base image.
 3. Save those images as tarballs for the airgapped side.
 4. Keep models, datasets, checkpoints, and customer files on persistent storage.
 
@@ -14,13 +14,13 @@ Edit `airgap.yaml` first:
 
 - `workflow.stages`: the Nemotron Customizer steps the customer wants to run
 - `dependencies`: central step dependency map, for example SFT training needs SFT packing
-- `step_images`: which task image each step should use
-- `task_images`: the base image, output tag, and known/import-probed Python requirements
+- `step_execution_images`: which execution image each step should use
+- `execution_images`: the base image, output tag, and known/import-probed Python requirements
 
 Only steps reached from `workflow.stages` are built. Steps are grouped by
 `base_image + repo_overlays`; each group gets one derivative image with the
 union of its small missing packages. If two selected step families share the
-same base image and repo overlays, the runner emits one combined task image for
+same base image and repo overlays, the runner emits one combined execution image for
 both.
 
 Run from the repo root:
@@ -45,7 +45,7 @@ To run only a few stages:
 uv run python deploy/nemotron-customizer/airgap/runner.py \
   --config deploy/nemotron-customizer/airgap/airgap.yaml \
   --stage validate \
-  --stage discover-task-deps
+  --stage discover-execution-deps
 ```
 
 To override the workflow without editing YAML, pass one or more selected
@@ -63,18 +63,18 @@ uv run python deploy/nemotron-customizer/airgap/runner.py \
 Outputs are written under `deploy/nemotron-customizer/airgap/out/` by default:
 
 - `airgap-manifest.yaml`: what was validated and built
-- `airgap-progress.yaml`: incomplete execute run state used for resume
-- `airgap-complete.yaml`: final execute run state after success
-- `requirements-<task-group>.txt`: small missing packages per task image
-- `repo-overlays-<task-group>.json`: git auto-mounts discovered from selected step configs
-- `submitter-image.tar`
-- `task-*.tar`
+- `airgap-build-state.yaml`: incomplete execute run state used for resume
+- `airgap-build-complete.yaml`: final execute run state after success
+- `requirements-<execution-group>.txt`: small missing packages per execution image
+- `repo-overlays-<execution-group>.json`: git auto-mounts discovered from selected step configs
+- `launcher-image.tar`
+- `execution-*.tar`
 - SHA256 checksums for saved image tarballs in `airgap-manifest.yaml`
 
-If an execute run fails midway, leave `airgap-progress.yaml` in place and rerun
+If an execute run fails midway, leave `airgap-build-state.yaml` in place and rerun
 the same command. Completed expensive actions are reused when their artifacts
 still exist. If you intentionally change the workflow or image plan before
-finishing, move or remove `airgap-progress.yaml` first; the runner will not
+finishing, move or remove `airgap-build-state.yaml` first; the runner will not
 silently overwrite incomplete state from a different plan.
 
 Runtime dependency probes use Docker volumes named
@@ -88,19 +88,19 @@ executor-visible persistent storage and reference them through config overrides
 and `run.env.mounts`.
 
 During dependency discovery, the runner mounts the connected-machine checkout
-into each task image only to probe imports. The final task image deliberately
-does not bake this repo; the submitter image and the normal nemo-run/nemo-runspec
+into each execution image only to probe imports. The final execution image deliberately
+does not bake this repo; the launcher image and the normal nemo-run/nemo-runspec
 code transport provide the repo to the remote job at submission time.
 
 Repo logistics stay outside `airgap.yaml`. If a selected step config contains
 `${auto_mount:git+...}`, the runner treats it as a connected-machine build input:
-it fetches that pinned repo and bakes it into the derivative task image at the
+it fetches that pinned repo and bakes it into the derivative execution image at the
 requested target path. Runtime jobs then use the baked image and do not clone
 from GitHub. Site-specific data/model mounts remain in env profiles or step
 overrides.
 
 If the connected machine is not the same architecture as the target cluster,
-set `platform: linux/amd64` on the submitter or task image entry in
+set `platform: linux/amd64` on the `launcher_image` or execution image entry in
 `airgap.yaml`. If you need to minimize transfer size for several images that
 share layers, `docker save -o all-images.tar tag1 tag2 ...` can be used after
 the runner builds the images; a single tar deduplicates shared layers better
@@ -124,8 +124,8 @@ workflow:
 When submitting inside the airgap, use the deploy overlay config so those git
 auto-mounts are cleared at runtime while persistent storage mounts from the env
 profile still apply. Use the image printed by the runner under
-`selected step images`, or read it from `out/airgap-manifest.yaml` under
-`step_images`.
+`selected execution images`, or read it from `out/airgap-manifest.yaml` under
+`step_execution_images`.
 
 ```bash
 uv run nemotron step run sft/megatron_bridge \

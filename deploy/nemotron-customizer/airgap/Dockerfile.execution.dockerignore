@@ -4,8 +4,8 @@
 !deploy/nemotron-customizer
 !deploy/nemotron-customizer/airgap
 !deploy/nemotron-customizer/airgap/out
-!deploy/nemotron-customizer/airgap/out/task-context
-!deploy/nemotron-customizer/airgap/out/task-context/**
+!deploy/nemotron-customizer/airgap/out/execution-context
+!deploy/nemotron-customizer/airgap/out/execution-context/**
 !deploy/nemotron-customizer/airgap/out/repo-overlays
 !deploy/nemotron-customizer/airgap/out/repo-overlays/**
 

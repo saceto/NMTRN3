@@ -1,4 +1,4 @@
-# Submitter image for Nemotron Customizer airgap.
+# Launcher image for Nemotron Customizer airgap.
 # It contains the repo and a uv-synced environment. It does not run training.
 
 ARG BASE_IMAGE=python:3.12-slim

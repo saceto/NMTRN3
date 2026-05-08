@@ -40,7 +40,7 @@ def test_airgap_runner_expands_and_validates_sft_dependency():
     ]
 
 
-def test_airgap_runner_groups_task_images_by_base_image_and_repo_overlays(tmp_path):
+def test_airgap_runner_groups_execution_images_by_base_image_and_repo_overlays(tmp_path):
     runner = _runner_module()
     overlay = runner.RepoOverlay(
         repo="Megatron-Bridge",
@@ -49,11 +49,11 @@ def test_airgap_runner_groups_task_images_by_base_image_and_repo_overlays(tmp_pa
         target="/opt/Megatron-Bridge",
     )
     cfg = {
-        "step_images": {
+        "step_execution_images": {
             "prep/sft_packing": "a",
             "sft/megatron_bridge": "b",
         },
-        "task_images": {
+        "execution_images": {
             "a": {
                 "base_image": "image:base",
                 "tag": "image:a",
@@ -69,7 +69,7 @@ def test_airgap_runner_groups_task_images_by_base_image_and_repo_overlays(tmp_pa
         },
     }
 
-    groups = runner.task_groups(
+    groups = runner.execution_groups(
         cfg,
         output_dir=tmp_path,
         step_infos={
@@ -107,17 +107,17 @@ def test_airgap_runner_groups_task_images_by_base_image_and_repo_overlays(tmp_pa
 def test_airgap_runner_only_builds_images_for_selected_steps(tmp_path):
     runner = _runner_module()
     cfg = {
-        "step_images": {
+        "step_execution_images": {
             "prep/sft_packing": "nemo-megatron",
             "sft/automodel": "nemo-automodel",
         },
-        "task_images": {
+        "execution_images": {
             "nemo-megatron": {"base_image": "nemo:base"},
             "nemo-automodel": {"base_image": "automodel:base"},
         },
     }
 
-    groups = runner.task_groups(cfg, output_dir=tmp_path, step_infos={"prep/sft_packing": object()})
+    groups = runner.execution_groups(cfg, output_dir=tmp_path, step_infos={"prep/sft_packing": object()})
 
     assert len(groups) == 1
     assert groups[0].name.startswith("nemo-megatron-")
@@ -131,7 +131,7 @@ def test_airgap_runner_maps_sdg_to_light_sdk_image(tmp_path):
 
     targets = runner.expand_targets(cfg)
     infos = runner.validate_targets(targets)
-    groups = runner.task_groups(cfg, output_dir=tmp_path, step_infos=infos)
+    groups = runner.execution_groups(cfg, output_dir=tmp_path, step_infos=infos)
 
     assert [target.spec for target in targets] == ["sdg/data_designer:tiny"]
     assert len(groups) == 1
@@ -147,7 +147,7 @@ def test_airgap_runner_maps_byob_to_data_designer_image(tmp_path):
 
     targets = runner.expand_targets(cfg)
     infos = runner.validate_targets(targets)
-    groups = runner.task_groups(cfg, output_dir=tmp_path, step_infos=infos)
+    groups = runner.execution_groups(cfg, output_dir=tmp_path, step_infos=infos)
 
     assert [target.spec for target in targets] == ["byob:tiny"]
     assert len(groups) == 1
@@ -165,7 +165,7 @@ def test_airgap_runner_target_override_selects_sdg_and_sft():
 
     targets = runner.expand_targets(cfg)
     infos = runner.validate_targets(targets)
-    groups = runner.task_groups(cfg, output_dir=runner.AIRGAP_DIR / "out", step_infos=infos)
+    groups = runner.execution_groups(cfg, output_dir=runner.AIRGAP_DIR / "out", step_infos=infos)
 
     assert [target.spec for target in targets] == [
         "sdg/data_designer:tiny",
@@ -187,11 +187,11 @@ def test_airgap_runner_splits_same_base_image_when_repo_overlays_differ(tmp_path
         target="/opt/Megatron-Bridge",
     )
     cfg = {
-        "step_images": {
+        "step_execution_images": {
             "prep/sft_packing": "nemo-megatron",
             "sft/megatron_bridge": "nemo-megatron",
         },
-        "task_images": {
+        "execution_images": {
             "nemo-megatron": {
                 "base_image": "nemo:base",
                 "tag": "nemo-airgap:latest",
@@ -199,7 +199,7 @@ def test_airgap_runner_splits_same_base_image_when_repo_overlays_differ(tmp_path
             },
         },
     }
-    groups = runner.task_groups(
+    groups = runner.execution_groups(
         cfg,
         output_dir=tmp_path,
         step_infos={
@@ -250,16 +250,16 @@ def test_airgap_runner_uses_collision_safe_repo_overlay_dirs():
 def test_airgap_runner_auto_adds_stage_prerequisites():
     runner = _runner_module()
 
-    assert runner.normalize_stages(["build-task-images"]) == [
+    assert runner.normalize_stages(["build-execution-images"]) == [
         "validate",
-        "discover-task-deps",
-        "build-task-images",
+        "discover-execution-deps",
+        "build-execution-images",
     ]
     assert runner.normalize_stages(["save-images"]) == [
         "validate",
-        "discover-task-deps",
-        "build-submitter",
-        "build-task-images",
+        "discover-execution-deps",
+        "build-launcher-image",
+        "build-execution-images",
         "save-images",
     ]
 
@@ -302,9 +302,9 @@ def test_airgap_runner_saved_image_manifest_has_checksum(tmp_path):
     image_tar = tmp_path / "image.tar"
     image_tar.write_text("image bytes", encoding="utf-8")
 
-    saved = runner.saved_image_manifest("image:tag", image_tar, execute=True, role="task", name="group")
+    saved = runner.saved_image_manifest("image:tag", image_tar, execute=True, role="execution", name="group")
 
-    assert saved["role"] == "task"
+    assert saved["role"] == "execution"
     assert saved["name"] == "group"
     assert saved["image"] == "image:tag"
     assert saved["tar"] == str(image_tar)

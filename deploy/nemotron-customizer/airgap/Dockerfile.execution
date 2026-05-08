@@ -1,11 +1,11 @@
-# Derivative task image for Nemotron Customizer airgap.
+# Derivative execution image for Nemotron Customizer airgap.
 # Built from the real training/runtime image and only adds small missing
 # wrapper packages.
 
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
-ARG TASK_REQUIREMENTS
+ARG EXECUTION_REQUIREMENTS
 ARG REPO_OVERLAYS
 ARG REPO_OVERLAYS_DIR
 ARG PYTHON_BIN=python
@@ -16,16 +16,16 @@ ENV TRANSFORMERS_OFFLINE=1
 ENV HF_DATASETS_OFFLINE=1
 ENV WANDB_MODE=offline
 
-COPY ${TASK_REQUIREMENTS} /opt/nemotron-airgap/task-requirements.txt
+COPY ${EXECUTION_REQUIREMENTS} /opt/nemotron-airgap/execution-requirements.txt
 COPY ${REPO_OVERLAYS} /opt/nemotron-airgap/repo-overlays.json
 COPY ${REPO_OVERLAYS_DIR}/ /opt/nemotron-airgap/repo-overlays/
 
 # Build-time installs keep --no-cache-dir so derivative image layers stay small.
-RUN if [ -s /opt/nemotron-airgap/task-requirements.txt ]; then \
+RUN if [ -s /opt/nemotron-airgap/execution-requirements.txt ]; then \
       if [ "${PIP_NO_DEPS}" = "true" ]; then \
-        ${PYTHON_BIN} -m pip install --no-cache-dir --no-deps -r /opt/nemotron-airgap/task-requirements.txt; \
+        ${PYTHON_BIN} -m pip install --no-cache-dir --no-deps -r /opt/nemotron-airgap/execution-requirements.txt; \
       else \
-        ${PYTHON_BIN} -m pip install --no-cache-dir -r /opt/nemotron-airgap/task-requirements.txt; \
+        ${PYTHON_BIN} -m pip install --no-cache-dir -r /opt/nemotron-airgap/execution-requirements.txt; \
       fi; \
     fi && \
     ${PYTHON_BIN} - <<'PY'
