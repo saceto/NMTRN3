@@ -172,6 +172,17 @@ nemotron/artifacts.md
 ```
 
 ```{toctree}
+:caption: Translation
+:hidden:
+
+About <translation/index.md>
+Getting Started <translation/getting-started.md>
+translation/explanation/index.md
+Tasks <translation/how-to/index.md>
+translation/reference/index.md
+```
+
+```{toctree}
 :caption: Customization
 :hidden:
 
