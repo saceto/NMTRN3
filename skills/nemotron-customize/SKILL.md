@@ -63,16 +63,16 @@ Goal: enumerate candidate steps and gather the user's constraints in one pass.
 machine-readable:
 
 ```bash
-nemotron step list --json                                  # all steps
-nemotron step list --json --category sft                   # by category
-nemotron step list --json --consumes training_jsonl        # by input type
-nemotron step list --json --produces checkpoint_megatron   # by output type
-nemotron step show <step_id>                               # full manifest
+nemotron steps list --json                                 # all steps
+nemotron steps list --json --category sft                  # by category
+nemotron steps list --json --consumes training_jsonl       # by input type
+nemotron steps list --json --produces checkpoint_megatron  # by output type
+nemotron steps show <step_id>                              # full manifest
 ```
 
-Implementation: [list_cmd.py](../../src/nemotron/cli/commands/step/list_cmd.py),
-[show_cmd.py](../../src/nemotron/cli/commands/step/show_cmd.py),
-[run_cmd.py](../../src/nemotron/cli/commands/step/run_cmd.py).
+Implementation: [list_cmd.py](../../src/nemotron/cli/commands/steps/list_cmd.py),
+[show_cmd.py](../../src/nemotron/cli/commands/steps/show_cmd.py),
+[run_cmd.py](../../src/nemotron/cli/commands/steps/run_cmd.py).
 
 Per-step JSON schema: `{id, name, category, description, tags, path,
 consumes:[{type,required,description}], produces:[...], parameters:[...]}`.
@@ -406,8 +406,8 @@ configs.
 
 ## Tool preferences
 
-- **Catalog discovery**: `nemotron step list --json --consumes <type>` — don't grep `**/step.toml`.
-- **Manifest read**: `nemotron step show <id>` — fastest single read.
+- **Catalog discovery**: `nemotron steps list --json --consumes <type>` — don't grep `**/step.toml`.
+- **Manifest read**: `nemotron steps show <id>` — fastest single read.
 - **Context packs**: load one large pack per stage via Act sub-agent — beats many small reads.
 - **Step.py read**: full file — they're <100 lines.
 - **Type validation**: read [types.toml](../../src/nemotron/steps/types.toml) once during Orient; keep in context through Verify.

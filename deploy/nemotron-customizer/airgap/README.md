@@ -128,7 +128,7 @@ profile still apply. Use the image printed by the runner under
 `step_execution_images`.
 
 ```bash
-uv run nemotron step run sft/megatron_bridge \
+uv run nemotron steps run sft/megatron_bridge \
   -c deploy/nemotron-customizer/airgap/configs/sft_megatron_bridge_tiny.yaml \
   -b <your-airgap-profile> \
   run.env.container_image=<image-printed-for-sft/megatron_bridge>
