@@ -49,6 +49,27 @@ If two sources say the same thing, the **deeper, more specific** one wins
 
 ---
 
+## Instructions
+
+Use this skill when the user asks for an end-to-end Nemotron-stack pipeline:
+fine-tuning, continued pretraining, alignment, evaluation, optimization, data
+curation, translation, or deployment-oriented conversion. Follow the workflow
+below in order:
+
+1. **Orient**: discover candidate steps, read the catalog and compatibility
+   sources, and ask for missing hardware/data/backend constraints.
+2. **Plan**: propose a stage DAG, validate artifact wiring, cite matched
+   patterns, and wait for user approval before writing code.
+3. **Act**: generate a forkable Python project from the selected step
+   manifests, runner code, and context packs.
+4. **Verify**: check generated files, configs, imports, artifact edges, and
+   README/pipeline consistency; fix issues before reporting completion.
+
+Do not treat this skill as general ML advice. The step library under
+[src/nemotron/steps/](../../src/nemotron/steps/) is the source of truth.
+
+---
+
 ## Workflow
 
 Four phases, in order: **Orient → Plan → Act → Verify.** Never skip Verify.
@@ -369,6 +390,38 @@ run `/nemotron-add-step` to land it in the catalog.
 | "Deploy to TensorRT-LLM" | Explorer (no step yet — derive from upstream library docs and add a `convert/*` step if the path stabilizes) |
 | "Train with X exotic backend" | Explorer or **ask** |
 | Ambiguous | **Ask** |
+
+---
+
+## Examples
+
+### Fine-tuning pipeline request
+
+User: "Fine-tune Nemotron on my JSONL conversations with 8xH100 and give me a
+runnable project."
+
+Expected handling: use Catalog mode. Read the SFT category, candidate
+`step.toml`, [types.toml](../../src/nemotron/steps/types.toml), and
+[hardware.md](../../src/nemotron/steps/hardware.md); plan a DAG from
+`training_jsonl` to a checkpoint artifact; validate the artifact chain; then
+generate the project only after the user approves the plan.
+
+### Multi-stage customization request
+
+User: "Continue pretraining on a domain corpus, evaluate MMLU/HumanEval, then
+export for serving."
+
+Expected handling: ask for missing constraints such as model, GPU topology,
+backend, output path, and deployment target. Then plan a pretrain → eval →
+convert/export DAG, cite relevant cross-step patterns, and verify each
+consume/produce edge against [types.toml](../../src/nemotron/steps/types.toml).
+
+### Unrelated request
+
+User: "Build a React leaderboard component."
+
+Expected handling: do not invoke this skill workflow. Answer as a frontend task
+and do not read Nemotron step catalogs or generate a training pipeline.
 
 ---
 
