@@ -13,14 +13,14 @@
 # limitations under the License.
 
 [step]
-id = "prep/pretrain_prep"
+id = "data_prep/pretrain_prep"
 name = "Pretrain Data — bin/idx Tokenisation"
-category = "prep"
+category = "data_prep"
 description = """\
 Tokenise raw text (HF datasets or local parquet/jsonl) into Megatron bin/idx
 shards and emit a blend.json that pretrain/megatron_bridge and pretrain/automodel
 can ingest directly."""
-tags = ["prep", "pretrain", "binidx", "tokenisation", "megatron"]
+tags = ["data_prep", "pretrain", "binidx", "tokenisation", "megatron"]
 
 [[consumes]]
 type = "filtered_jsonl"

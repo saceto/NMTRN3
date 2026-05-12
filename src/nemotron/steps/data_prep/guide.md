@@ -1,6 +1,6 @@
 # Data Prep — When You Need `sft_packing`
 
-| Downstream trainer | Need `prep/sft_packing`? | Why |
+| Downstream trainer | Need `data_prep/sft_packing`? | Why |
 |---|---|---|
 | `sft/megatron_bridge` | **Yes** | Megatron-Bridge SFT expects `packed_parquet`, not raw JSONL. |
 | AutoModel / HuggingFace-style SFT | **No** | These workflows can read `training_jsonl` directly. |

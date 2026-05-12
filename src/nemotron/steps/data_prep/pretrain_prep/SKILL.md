@@ -1,11 +1,11 @@
 ---
-name: nemotron-prep-pretrain-binidx
-description: Configure the Nemotron prep/pretrain_prep step that tokenizes HF or local text blends into Megatron bin/idx shards and a blend.json for pretrain/automodel or pretrain/megatron_bridge. Use when preparing pretraining or continued-pretraining data, rebuilding tokenizer-locked corpora, or validating data splits.
+name: nemotron-data-prep-pretrain-binidx
+description: Configure the Nemotron data_prep/pretrain_prep step that tokenizes HF or local text blends into Megatron bin/idx shards and a blend.json for pretrain/automodel or pretrain/megatron_bridge. Use when preparing pretraining or continued-pretraining data, rebuilding tokenizer-locked corpora, or validating data splits.
 ---
 
 # Pretrain Bin/Idx Prep
 
-Use `prep/pretrain_prep` when downstream pretraining expects Megatron `binidx` data.
+Use `data_prep/pretrain_prep` when downstream pretraining expects Megatron `binidx` data.
 
 Before changing configs or code, read `step.toml` to understand the step flow, consumed and produced artifacts, important parameters, strategies, failure modes, and upstream references.
 
@@ -33,10 +33,10 @@ Before changing configs or code, read `step.toml` to understand the step flow, c
 
 ## Local Files
 
-- Contract: `src/nemotron/steps/prep/pretrain_prep/step.toml`
-- Runner: `src/nemotron/steps/prep/pretrain_prep/step.py`
-- Configs: `src/nemotron/steps/prep/pretrain_prep/config/default.yaml`, `src/nemotron/steps/prep/pretrain_prep/config/tiny.yaml`
-- Sample blend: `src/nemotron/steps/prep/pretrain_prep/data/blend_tiny.json`
+- Contract: `src/nemotron/steps/data_prep/pretrain_prep/step.toml`
+- Runner: `src/nemotron/steps/data_prep/pretrain_prep/step.py`
+- Configs: `src/nemotron/steps/data_prep/pretrain_prep/config/default.yaml`, `src/nemotron/steps/data_prep/pretrain_prep/config/tiny.yaml`
+- Sample blend: `src/nemotron/steps/data_prep/pretrain_prep/data/blend_tiny.json`
 
 ## Guardrails
 

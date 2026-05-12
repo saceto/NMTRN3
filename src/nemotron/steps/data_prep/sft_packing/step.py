@@ -2,7 +2,7 @@
 # /// script
 # [tool.runspec]
 # schema = "1"
-# name = "steps/prep/sft_packing"
+# name = "steps/data_prep/sft_packing"
 # image = "anyscale/ray:2.49.2-py312"
 #
 # [tool.runspec.run]
@@ -52,7 +52,7 @@ from nemotron.kit.train_script import (
     load_omegaconf_yaml,
     parse_config_and_overrides,
 )
-from nemotron.steps.prep._common import (
+from nemotron.steps.data_prep._common import (
     chdir_to_scratch,
     config_dataclass,
     init_prep_wandb,

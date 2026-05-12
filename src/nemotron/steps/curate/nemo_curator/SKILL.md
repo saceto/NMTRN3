@@ -1,6 +1,6 @@
 ---
 name: nemotron-curate-nemo-curator
-description: Configure Nemotron curate/nemo_curator to read JSONL text, optionally hydrate a Hugging Face dataset snapshot, apply light NeMo Curator language, word-count, and domain filters, and write filtered_jsonl for translate or prep steps.
+description: Configure Nemotron curate/nemo_curator to read JSONL text, optionally hydrate a Hugging Face dataset snapshot, apply light NeMo Curator language, word-count, and domain filters, and write filtered_jsonl for translate or data_prep steps.
 ---
 
 # Lightweight Text Curation (NeMo Curator)

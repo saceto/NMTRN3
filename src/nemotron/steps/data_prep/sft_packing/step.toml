@@ -13,11 +13,11 @@
 # limitations under the License.
 
 [step]
-id = "prep/sft_packing"
+id = "data_prep/sft_packing"
 name = "SFT Data Packing"
-category = "prep"
+category = "data_prep"
 description = """Apply the chat template, tokenize training JSONL, and pack examples into Megatron-Bridge-compatible Parquet shards for SFT."""
-tags = ["prep", "sft", "packing", "parquet", "megatron-bridge"]
+tags = ["data_prep", "sft", "packing", "parquet", "megatron-bridge"]
 
 [[consumes]]
 type = "training_jsonl"

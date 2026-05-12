@@ -13,13 +13,13 @@
 # limitations under the License.
 
 [step]
-id = "prep/rl_prep"
+id = "data_prep/rl_prep"
 name = "RL Data Prep (resolve + shard)"
-category = "prep"
+category = "data_prep"
 description = """\
 Resolve HuggingFace dataset references in an RL data blend and shard the
 output JSONL into the prompt / preference layout expected by rl/nemo_rl/*."""
-tags = ["prep", "rl", "dpo", "grpo", "jsonl"]
+tags = ["data_prep", "rl", "dpo", "grpo", "jsonl"]
 
 [[consumes]]
 type = "training_jsonl"

@@ -2,7 +2,7 @@
 # /// script
 # [tool.runspec]
 # schema = "1"
-# name = "steps/prep/rl_prep"
+# name = "steps/data_prep/rl_prep"
 # image = "anyscale/ray:2.49.2-py312"
 #
 # [tool.runspec.run]
@@ -47,7 +47,7 @@ from nemotron.kit.train_script import (
     load_omegaconf_yaml,
     parse_config_and_overrides,
 )
-from nemotron.steps.prep._common import init_prep_wandb
+from nemotron.steps.data_prep._common import init_prep_wandb
 
 DEFAULT_CONFIG = Path(__file__).parent / "config" / "default.yaml"
 

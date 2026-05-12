@@ -41,16 +41,9 @@ from nemo_curator.stages.text.classifiers import MultilingualDomainClassifier
 from nemo_curator.stages.text.io.reader import JsonlReader
 from nemo_curator.stages.text.io.writer import JsonlWriter
 
-try:
-    from nemo_curator.stages.text.filters import FastTextLangId, WordCountFilter
-except ImportError:
-    from nemo_curator.stages.text.filters.fasttext import FastTextLangId
-    from nemo_curator.stages.text.filters.heuristic.string import WordCountFilter
+from nemo_curator.stages.text.filters import FastTextLangId, WordCountFilter
 
-try:
-    from nemo_curator.stages.text.modules import Filter, ScoreFilter
-except ImportError:
-    from nemo_curator.stages.text.filters import Filter, ScoreFilter
+from nemo_curator.stages.text.modules import Filter, ScoreFilter
 
 DEFAULT_CONFIG = Path(__file__).parent / "config" / "default.yaml"
 

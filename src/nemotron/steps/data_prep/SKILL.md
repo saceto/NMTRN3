@@ -1,11 +1,11 @@
 ---
-name: nemotron-prep
-description: Navigate Nemotron data preparation steps for SFT packing, pretraining bin/idx tokenization, and RL prompt or preference sharding. Use when choosing, configuring, validating, or chaining prep steps before pretrain, CPT, SFT, PEFT, DPO, RLVR, or RLHF training, including sovereign customizations where blend composition decides downstream behavior.
+name: nemotron-data-prep
+description: Navigate Nemotron data preparation steps for SFT packing, pretraining bin/idx tokenization, and RL prompt or preference sharding. Use when choosing, configuring, validating, or chaining data_prep steps before pretrain, CPT, SFT, PEFT, DPO, RLVR, or RLHF training, including sovereign customizations where blend composition decides downstream behavior.
 ---
 
-# Nemotron Prep
+# Nemotron Data Prep
 
-Pick a prep step, lock its outputs to a tokenizer, and keep the prepared
+Pick a data_prep step, lock its outputs to a tokenizer, and keep the prepared
 artifact compatible with the downstream trainer. Prepared data is a
 **versioned data product** — name it after the (tokenizer, template, pack_size)
 tuple, not after the date.
@@ -14,11 +14,11 @@ tuple, not after the date.
 
 | Need | Step | Produces |
 |---|---|---|
-| Pack chat JSONL for Megatron-Bridge SFT or PEFT | [`prep/sft_packing`](sft_packing/SKILL.md) | `packed_parquet` |
-| Tokenize text into Megatron pretraining shards | [`prep/pretrain_prep`](pretrain_prep/SKILL.md) | `binidx` + `blend.json` |
-| Resolve and shard RL prompt or preference data | [`prep/rl_prep`](rl_prep/SKILL.md) | `training_jsonl` (sharded) |
+| Pack chat JSONL for Megatron-Bridge SFT or PEFT | [`data_prep/sft_packing`](sft_packing/SKILL.md) | `packed_parquet` |
+| Tokenize text into Megatron pretraining shards | [`data_prep/pretrain_prep`](pretrain_prep/SKILL.md) | `binidx` + `blend.json` |
+| Resolve and shard RL prompt or preference data | [`data_prep/rl_prep`](rl_prep/SKILL.md) | `training_jsonl` (sharded) |
 
-## When to use `prep/sft_packing`
+## When to use `data_prep/sft_packing`
 
 | Downstream trainer | Packing required? | Why |
 |---|---|---|
@@ -46,9 +46,9 @@ Skip packing when:
 ## Smoke commands
 
 ```bash
-nemotron steps run prep/sft_packing   -c tiny
-nemotron steps run prep/pretrain_prep -c tiny
-nemotron steps run prep/rl_prep       -c tiny
+nemotron steps run data_prep/sft_packing   -c tiny
+nemotron steps run data_prep/pretrain_prep -c tiny
+nemotron steps run data_prep/rl_prep       -c tiny
 ```
 
 ## Patterns to cite

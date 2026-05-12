@@ -1,6 +1,6 @@
 # Data Preparation
 
-```{include} ../../../../src/nemotron/steps/prep/guide.md
+```{include} ../../../../src/nemotron/steps/data_prep/guide.md
 ```
 
 ```{toctree}

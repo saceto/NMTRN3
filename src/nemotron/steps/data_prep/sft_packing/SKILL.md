@@ -1,11 +1,11 @@
 ---
-name: nemotron-prep-sft-packing
-description: Configure the Nemotron prep/sft_packing step that applies chat templates, tokenizes training JSONL, and emits Megatron-Bridge packed Parquet shards for SFT or PEFT. Use when preparing data for sft/megatron_bridge, peft/megatron_bridge, packed sequence training, loss-mask validation, or sequence-length alignment.
+name: nemotron-data-prep-sft-packing
+description: Configure the Nemotron data_prep/sft_packing step that applies chat templates, tokenizes training JSONL, and emits Megatron-Bridge packed Parquet shards for SFT or PEFT. Use when preparing data for sft/megatron_bridge, peft/megatron_bridge, packed sequence training, loss-mask validation, or sequence-length alignment.
 ---
 
 # SFT Packing
 
-Use `prep/sft_packing` when the downstream step consumes `packed_parquet`, especially `sft/megatron_bridge` or `peft/megatron_bridge`.
+Use `data_prep/sft_packing` when the downstream step consumes `packed_parquet`, especially `sft/megatron_bridge` or `peft/megatron_bridge`.
 
 Before changing configs or code, read `step.toml` to understand the step flow, consumed and produced artifacts, important parameters, strategies, failure modes, and upstream references.
 
@@ -32,10 +32,10 @@ Before changing configs or code, read `step.toml` to understand the step flow, c
 
 ## Local Files
 
-- Contract: `src/nemotron/steps/prep/sft_packing/step.toml`
-- Runner: `src/nemotron/steps/prep/sft_packing/step.py`
-- Configs: `src/nemotron/steps/prep/sft_packing/config/default.yaml`, `src/nemotron/steps/prep/sft_packing/config/tiny.yaml`
-- Sample blend: `src/nemotron/steps/prep/sft_packing/data/blend_tiny.json`
+- Contract: `src/nemotron/steps/data_prep/sft_packing/step.toml`
+- Runner: `src/nemotron/steps/data_prep/sft_packing/step.py`
+- Configs: `src/nemotron/steps/data_prep/sft_packing/config/default.yaml`, `src/nemotron/steps/data_prep/sft_packing/config/tiny.yaml`
+- Sample blend: `src/nemotron/steps/data_prep/sft_packing/data/blend_tiny.json`
 
 ## Avoid
 

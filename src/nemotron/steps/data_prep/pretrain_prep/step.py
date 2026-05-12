@@ -2,7 +2,7 @@
 # /// script
 # [tool.runspec]
 # schema = "1"
-# name = "steps/prep/pretrain_prep"
+# name = "steps/data_prep/pretrain_prep"
 # image = "anyscale/ray:2.49.2-py312"
 #
 # [tool.runspec.run]
@@ -35,7 +35,7 @@
 
 """Thin pretrain bin/idx wrapper. Tokenises HF/local text into Megatron bin/idx + blend.json.
 
-Mirrors the runtime safety pattern from prep/sft_packing:
+Mirrors the runtime safety pattern from data_prep/sft_packing:
   * Falls back to a self-contained ``data/blend_tiny.json`` when YAML omits
     ``blend_path``, so the same config works under any source layout
     (local / slurm /nemo_run/code / lepton /mnt/lustre-shared/_nemotron).
@@ -63,7 +63,7 @@ from nemotron.kit.train_script import (
     load_omegaconf_yaml,
     parse_config_and_overrides,
 )
-from nemotron.steps.prep._common import (
+from nemotron.steps.data_prep._common import (
     chdir_to_scratch,
     config_dataclass,
     init_prep_wandb,
