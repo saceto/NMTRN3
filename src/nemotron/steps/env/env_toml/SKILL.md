@@ -1,13 +1,13 @@
 ---
 name: nemotron-env-toml
-description: Create, validate, and adjust Nemotron env.toml profiles for Lepton, Slurm, Ray, NeMo-RL, NeMo-Gym, AutoModel, ModelOpt, Curator, Data Designer SDG, and functional step runs. Use when a user needs an env.toml from scratch, profile inheritance fixes, executor/resource profile advice, or debugging Ray runtime-env and placement issues.
+description: Create, validate, and adjust Nemotron env.toml profiles for Lepton, Slurm, DGX Cloud, Ray, NeMo-RL, NeMo-Gym, AutoModel, ModelOpt, Curator, Data Designer SDG, and functional step runs. Use when a user needs an env.toml from scratch, profile inheritance fixes, executor/resource profile advice, or debugging Ray runtime-env and placement issues.
 ---
 
 # Env TOML
 
 Use `env/env_toml` to generate starter env profile files and to preserve hard-earned profile conventions.
 
-Before editing profiles, read `step.toml` for the contract, then choose `config/lepton.yaml` or `config/slurm.yaml`.
+Before editing profiles, read `step.toml` for the contract, then choose `config/lepton.yaml`, `config/slurm.yaml`, or `config/dgxcloud.yaml`.
 
 ## Workflow
 
@@ -27,20 +27,28 @@ uv run nemotron steps run env/env_toml -c slurm
 export NEMOTRON_ENV_FILE=env.slurm.toml
 ```
 
-The loader in `src/nemo_runspec/env.py` searches for repository-root `env.toml` by default. To use a generated backend file, set `NEMOTRON_ENV_FILE` to `env.lepton.toml` or `env.slurm.toml` before running `--run` or `--batch` commands.
+For DGX Cloud:
+
+```bash
+uv run nemotron steps run env/env_toml -c dgxcloud
+export NEMOTRON_ENV_FILE=env.dgxcloud.toml
+```
+
+The loader in `src/nemo_runspec/env.py` searches for repository-root `env.toml` by default. To use a generated backend file, set `NEMOTRON_ENV_FILE` to `env.lepton.toml`, `env.slurm.toml`, or `env.dgxcloud.toml` before running `--run` or `--batch` commands.
 
 3. Set site-specific values in config overrides or edit the generated file:
    - Lepton: `node_group`, `resource_shape`, `nemo_run_dir`, mount `path`/`from`
    - Slurm: `host`, `user`, `account`, `partition`, `remote_job_dir`, mounts
+   - DGX Cloud: `base_url`, `kube_apiserver_url`, `client_id`, `project_name`, PVC name/claim/path, `pvc_nemo_run_dir`
    - Shared: container image, `HF_HOME`, output directories, W&B project/entity
 
 4. Validate by compiling one small case before submitting.
 
 ## Nuances
 
-- Prefer one backend base and concrete profiles named for individual steps, such as `lepton_prep_sft_packing`, `lepton_pretrain_megatron_bridge`, `lepton_sdg_data_designer_tiny`, or `slurm_optimize_modelopt_quantize`.
+- Prefer one backend base and concrete profiles named for individual steps, such as `lepton_prep_sft_packing`, `lepton_pretrain_megatron_bridge`, `lepton_sdg_data_designer_tiny`, `slurm_optimize_modelopt_quantize`, or `dgxcloud_pretrain_megatron_bridge`.
 - Env profiles are inherited with `extends`; child profiles should override only what the step needs, such as image, node count, startup commands, or output path.
-- Data-prep profiles should be CPU-only by default. For Slurm prep profiles, override the GPU base with CPU partitions, `gpus_per_node = 0`, `build_include_gpus = false`, and enough `cpus_per_task` for Ray/Xenna. For Lepton prep profiles, use a CPU `resource_shape` and `gpus_per_node = 0`.
+- Data-prep profiles should be CPU-only by default. For Slurm prep profiles, override the GPU base with CPU partitions, `gpus_per_node = 0`, `build_include_gpus = false`, and enough `cpus_per_task` for Ray/Xenna. For Lepton prep profiles, use a CPU `resource_shape` and `gpus_per_node = 0`. For DGX Cloud prep profiles, keep `gpus_per_node = 0` and provide `RAY_RUNTIME_ENV_PYTHONPATH` for staged source.
 - Keep secrets as `${oc.env:...}` placeholders. Do not write tokens directly into env files.
 - Keep `[wandb]` for run metadata and pass `WANDB_API_KEY`/`WANDB_PROJECT` through profile `env_vars` so subprocess-heavy steps such as ModelOpt pruning/quantization inherit logging settings.
 - Do not put every NeMo-RL runtime flag in env files. Step YAML `run.env.env_vars` carries runtime-specific flags; the config loader deep-merges those with the selected env profile.
@@ -48,6 +56,7 @@ The loader in `src/nemo_runspec/env.py` searches for repository-root `env.toml` 
 - For Ray jobs, avoid job `runtime_env` workdirs when vLLM or NeMo-RL starts nested Ray actors. Use staged source plus `PYTHONPATH` and keep source-transport cleanup in the runner, not in env.toml profiles.
 - For RLHF with GenRM, budget physical Ray nodes for policy/generation, NeMo-Gym GPU servers, and extra placement headroom. For example, a small logical `cluster.num_nodes=2` plus `env.nemo_gym.num_gpu_nodes=1` should use a 4x8-GPU Lepton profile until proven stable.
 - Use separate image bases: NeMo for Megatron Bridge, NeMo-RL `nvcr.io/nvidia/nemo-rl:v0.6.0` for DPO/RLVR/RLHF, NeMo-AutoModel for AutoModel, and NeMo 26.02 for ModelOpt.
+- For DGX Cloud profiles, keep Run:AI credentials and client secrets as `${oc.env:...}` placeholders, use existing PVC declarations for shared storage, and keep `pvc_nemo_run_dir` on the mounted workspace path.
 - Use Curator image profiles for `byob`, `translate/translation`, and `curate/nemo_curator`; use the normal NeMo image with `data-designer==0.5.5` for `sdg/data_designer`.
 - For Lepton NeMo-RL profiles, keep `ray_version` on the latest workspace-supported Ray version. NeMo-RL v0.6.0 pins Ray 2.54 upstream, but some Lepton workspaces may only accept older Ray versions such as 2.48.0.
 - Keep functional runner `gpu_count` aligned with the env profile, not only the step config.
@@ -56,7 +65,7 @@ The loader in `src/nemo_runspec/env.py` searches for repository-root `env.toml` 
 
 - Contract: `src/nemotron/steps/env/env_toml/step.toml`
 - Runner: `src/nemotron/steps/env/env_toml/step.py`
-- Configs: `src/nemotron/steps/env/env_toml/config/lepton.yaml`, `src/nemotron/steps/env/env_toml/config/slurm.yaml`
+- Configs: `src/nemotron/steps/env/env_toml/config/lepton.yaml`, `src/nemotron/steps/env/env_toml/config/slurm.yaml`, `src/nemotron/steps/env/env_toml/config/dgxcloud.yaml`
 - Loader behavior: `src/nemo_runspec/env.py`, `src/nemo_runspec/config/loader.py`
 
 ## Guardrails
