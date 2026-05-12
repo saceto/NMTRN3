@@ -12,7 +12,7 @@ preamble: |
   #
   # Example usage after review:
   #   export NEMOTRON_ENV_FILE=env.slurm.toml
-  #   uv run nemotron steps run prep/sft_packing -c tiny --batch slurm_prep_sft_packing
+  #   uv run nemotron steps run data_prep/sft_packing -c tiny --batch slurm_prep_sft_packing
   #   uv run nemotron steps run pretrain/megatron_bridge -c tiny --batch slurm_pretrain_megatron_bridge
   #   uv run nemotron steps run sft/megatron_bridge -c tiny --batch slurm_sft_megatron_bridge
   #   uv run nemotron steps run rl/nemo_rl/dpo -c tiny --batch slurm_rl_nemo_rl_dpo
@@ -75,7 +75,7 @@ sections:
       PYTHONPATH: /nemo_run/code/src
       RAY_DEDUP_LOGS: "0"
 
-  # prep/sft_packing: data prep is CPU-only. Override the GPU base so Slurm
+  # data_prep/sft_packing: data prep is CPU-only. Override the GPU base so Slurm
   # does not submit to GPU partitions or request GPUs for the image import/job.
   slurm_prep_sft_packing:
     extends: slurm_base

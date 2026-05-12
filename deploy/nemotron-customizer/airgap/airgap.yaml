@@ -77,7 +77,6 @@ step_execution_images:
   sdg/data_designer: nemo-data-designer
   sft/automodel: nemo-automodel
   sft/megatron_bridge: nemo-megatron
-  translate/nemo_skills: nemo-curator
   translate/translation: nemo-curator
 
 execution_images:

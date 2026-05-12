@@ -146,9 +146,6 @@ def _text_field(value: Any) -> str | list[str]:
 
 
 def _build_translation_stage(config: dict[str, Any]) -> Any:
-    # Curator moved the translation stages under `experimental/translation` while
-    # the workflow is still being validated. Try the new path first; fall back
-    # to the legacy location for older Curator pins.
     from nemo_curator.stages.text.experimental.translation import TranslationStage
 
     faith_cfg = config.get("faith_eval", {}) or {}

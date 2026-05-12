@@ -93,7 +93,7 @@ generated code.
 ```toml
 [[stages]]
 id = "01_translate"
-step = "translate/nemo_skills"
+step = "translate/translation"
 consumes = "filtered_jsonl"
 produces = "translated_jsonl"
 

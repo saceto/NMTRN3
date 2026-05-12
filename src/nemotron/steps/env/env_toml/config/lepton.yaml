@@ -14,7 +14,7 @@ preamble: |
   #
   # Example usage after review:
   #   export NEMOTRON_ENV_FILE=env.lepton.toml
-  #   uv run nemotron steps run prep/sft_packing -c tiny --batch lepton_prep_sft_packing
+  #   uv run nemotron steps run data_prep/sft_packing -c tiny --batch lepton_prep_sft_packing
   #   uv run nemotron steps run pretrain/megatron_bridge -c tiny --batch lepton_pretrain_megatron_bridge
   #   uv run nemotron steps run sft/megatron_bridge -c tiny --batch lepton_sft_megatron_bridge
   #   uv run nemotron steps run rl/nemo_rl/dpo -c tiny --batch lepton_rl_nemo_rl_dpo
@@ -84,7 +84,7 @@ sections:
       RAY_DEDUP_LOGS: "0"
       RAY_GRAFANA_IFRAME_HOST: ""
 
-  # prep/sft_packing: data prep is CPU-only. Override the GPU base so Lepton
+  # data_prep/sft_packing: data prep is CPU-only. Override the GPU base so Lepton
   # schedules a CPU shape and the executor does not request GPUs.
   lepton_prep_sft_packing:
     extends: lepton_base

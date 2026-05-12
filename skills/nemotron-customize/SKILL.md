@@ -266,7 +266,7 @@ APIs from memory. Mirror what the in-repo code does:
 - [steps/_runners/modelopt.py](../../src/nemotron/steps/_runners/modelopt.py) — used by quantize/prune/distill.
 
 For steps without a context pack (`sft/megatron_bridge`, `eval/model_eval`,
-`curate/nemo_curator`, `translate/nemo_skills`, `convert/*`), the agent
+`curate/nemo_curator`, `translate/translation`, `convert/*`), the agent
 combines: per-step `SKILL.md` + `step.toml [[strategies]]` + `step.py` + the
 URLs in `[reference]`. That's enough.
 
@@ -376,7 +376,7 @@ values, then follow that skill's validate/build/run workflow.
 | "Distill / quantize / prune a model" | Catalog ([optimize/modelopt/*](../../src/nemotron/steps/optimize/modelopt/)) |
 | "DPO / RLVR / GRPO / RLHF" | Catalog ([rl/nemo_rl/*](../../src/nemotron/steps/rl/nemo_rl/)) |
 | "Synthesize preference / SFT data" | Catalog ([sdg/data_designer](../../src/nemotron/steps/sdg/data_designer/)) |
-| "Translate EN → \<lang\>" | Catalog ([translate/nemo_skills](../../src/nemotron/steps/translate/nemo_skills/)) |
+| "Translate EN → \<lang\>" | Catalog ([translate/translation](../../src/nemotron/steps/translate/translation/)) |
 | "Curate web text" | Catalog ([curate/nemo_curator](../../src/nemotron/steps/curate/nemo_curator/)) |
 | "Deploy to TensorRT-LLM" | Explorer (no step yet — derive from upstream library docs and add a `convert/*` step if the path stabilizes) |
 | "Build an airgap bundle", "offline cluster", "no internet", "image tarballs for these steps" | Explicit airgap handoff |

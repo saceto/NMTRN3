@@ -42,7 +42,6 @@ faith_eval:
   enabled: true
   threshold: 2.5
   model_name: ""
-  segment_level: true
   filter_enabled: true
 
 nmt:
