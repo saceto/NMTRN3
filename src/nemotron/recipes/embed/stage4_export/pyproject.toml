@@ -1,7 +1,7 @@
 [project]
 name = "recipe-runner-export"
 version = "0.0.0"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "onnx>=1.16.0",
     "onnxruntime>=1.18.0",
@@ -27,7 +27,9 @@ tensorrt = [
 # Note: exclude-dependencies injected dynamically by run_uv.py
 
 [tool.uv]
-override-dependencies = ["transformers>=5,<6"]
+# Match stage2 finetune: saved Automodel bidirectional checkpoints call the
+# Transformers 5.0/5.1 create_bidirectional_mask API.
+override-dependencies = ["transformers>=5.0,<5.2"]
 exclude-dependencies = ["transformer-engine", "nvidia-pytriton"]
 
 # Pin Linux torch installs to cu129. CUDA 13 drivers can run cu12.x wheels via

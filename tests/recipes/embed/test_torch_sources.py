@@ -52,3 +52,31 @@ def test_embed_export_lock_pins_linux_torchvision_to_cu129() -> None:
         and package["source"]["registry"] == "https://download.pytorch.org/whl/cu129"
         for package in torchvision_packages
     )
+
+
+def test_embed_export_stage_matches_finetune_python_and_transformers_ranges() -> None:
+    with open(EMBED_DIR / "stage4_export" / "pyproject.toml", "rb") as f:
+        data = tomllib.load(f)
+
+    assert data["project"]["requires-python"] == ">=3.12,<3.13"
+    assert data["tool"]["uv"]["override-dependencies"] == ["transformers>=5.0,<5.2"]
+
+
+def test_embed_export_lock_matches_finetune_transformers_range() -> None:
+    with open(EMBED_DIR / "stage4_export" / "uv.lock", "rb") as f:
+        data = tomllib.load(f)
+
+    assert data["requires-python"] == "==3.12.*"
+
+    transformer_packages = [
+        package
+        for package in data["package"]
+        if package["name"] == "transformers"
+    ]
+    assert [package["version"] for package in transformer_packages] == ["5.1.0"]
+
+    assert not any(
+        package["name"] == "nvidia-resiliency-ext"
+        and package["version"] == "0.5.0"
+        for package in data["package"]
+    )
