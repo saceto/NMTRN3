@@ -1259,10 +1259,13 @@ SFT_PACKING_SUBMIT_LOG="$LEPTON_ROOT/sft_packing_submit.log"
 SFT_OUTPUT_DIR="$SFT_PREP_DIR" \
   uv run --no-sync nemotron steps run data_prep/sft_packing \
   -c tiny \
+  max_rows=100 \
   --batch lepton_prep_sft_packing 2>&1 | tee "$SFT_PACKING_SUBMIT_LOG"
 SFT_PACKING_JOB_ID="$(grep -oE 'data-prep-sft-packing-step-[a-z0-9]+' "$SFT_PACKING_SUBMIT_LOG" | tail -1)"
 test -n "$SFT_PACKING_JOB_ID"
 wait_for_lepton_job "$SFT_PACKING_JOB_ID"
+test -d "$SFT_PREP_DIR/splits/train"
+find -L "$SFT_PREP_DIR/splits/train" -maxdepth 1 -type f -name "*.parquet" -print -quit | grep -q .
 
 PRETRAIN_PREP_SUBMIT_LOG="$LEPTON_ROOT/pretrain_prep_submit.log"
 PRETRAIN_OUTPUT_DIR="$PRETRAIN_PREP_DIR" \
@@ -1341,12 +1344,12 @@ Prerequisites: Agent environment available; generated and reviewed `env.lepton.t
 Ask the agent:
 
 ```text
-Run the tiny training workflow on Lepton. Generate the Lepton env file, run data_prep/sft_packing with the packaged tiny config, then submit the tiny SFT Megatron-Bridge training job using SFT_PACKED_DIR from the data-prep output. Do not override model names, dataset names, split sizes, or scheduler knobs.
+Run the tiny training workflow on Lepton. Generate the Lepton env file, run data_prep/sft_packing with the packaged tiny config and max_rows=100, then submit the tiny SFT Megatron-Bridge training job using SFT_PACKED_DIR from the data-prep output. Do not override model names, dataset names, split sizes, or scheduler knobs.
 ```
 
 Success criteria:
 
-- Uses `nemotron steps run data_prep/sft_packing -c tiny --batch lepton_prep_sft_packing`.
+- Uses `nemotron steps run data_prep/sft_packing -c tiny max_rows=100 --batch lepton_prep_sft_packing`.
 - Uses `nemotron steps run sft/megatron_bridge -c tiny --batch lepton_sft_megatron_bridge`.
 - Passes the SFT packing output to training through `SFT_PACKED_DIR`.
 - Keeps input/output under shared storage.
