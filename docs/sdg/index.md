@@ -23,7 +23,7 @@ Generate synthetic training data with [NeMo Data Designer](https://nvidia-nemo.g
 Three output shapes ship out of the box: SFT chat data, tool-calling SFT data, and DPO preference pairs.
 
 :::{tip}
-New to SDG? Start with the {doc}`getting-started` tutorial to run the bundled pipeline and produce your first dataset in 5–10 minutes.
+New to SDG or new to model training? Read {doc}`using-skills` for a short guide to productive agent sessions, then start the {doc}`getting-started` tutorial to run the bundled pipeline and produce your first dataset in 5 to 10 minutes.
 :::
 
 ## When to Use
@@ -70,6 +70,14 @@ Run the bundled pipeline end-to-end: preview two records, generate five, inspect
 {bdg-success}`5–10 min` {bdg-secondary}`tutorial`
 :::
 
+:::{grid-item-card} {octicon}`heart;1.5em;sd-mr-1` Use the SDG Skill With Confidence
+:link: using-skills
+:link-type: doc
+Prepare for a focused chat with a coding agent: opening brief, seed ideas, and how `SKILL.md` supports the session without memorization.
++++
+{bdg-success}`10 min read` {bdg-secondary}`newcomer`
+:::
+
 :::{grid-item-card} {octicon}`checklist;1.5em;sd-mr-1` How-To Guides
 :link: how-to/index
 :link-type: doc
@@ -97,6 +105,7 @@ YAML config schema, CLI flags, output projection shapes, and troubleshooting.
 | Guide | What You'll Do | Time |
 |---|---|---|
 | {doc}`getting-started` | Preview and generate your first synthetic SFT dataset | 5–10 min |
+| {doc}`using-skills` | Run a productive agent session: brief, seeds, plain terms, and light use of `SKILL.md` | 10 min read |
 
 ```
 

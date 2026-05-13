@@ -177,6 +177,7 @@ nemotron/artifacts.md
 
 About <sdg/index>
 Getting Started <sdg/getting-started>
+Tips for Using Agents <sdg/using-skills>
 Tasks <sdg/how-to/index>
 Reference <sdg/reference/index>
 ```

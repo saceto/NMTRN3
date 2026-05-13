@@ -18,7 +18,10 @@ limitations under the License.
 (sdg-how-to-index)=
 # Synthetic Data How-To Guides
 
-Task-focused guides for common SDG workflows. For pipeline overview and when to use it, refer to {doc}`../index`. For your first run, start with {doc}`../getting-started`.
+This section provides task-focused guides for common SDG workflows.
+For your first run, start with {doc}`../getting-started`.
+
+If you are new to model training or want a calmer on-ramp before tasks, read {doc}`../using-skills` for how to run a productive session with a coding agent.
 
 ::::{grid} 1 2 2 2
 :gutter: 1 1 1 2
