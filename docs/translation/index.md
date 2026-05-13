@@ -13,18 +13,21 @@ content:
 (translation-index)=
 # Translation With Nemotron
 
-`nemotron steps translation` translates selected fields in JSON Lines (JSONL) or Apache Parquet files through the checked-in `translate/translation` step: a NVIDIA NeMo Curator reader, `TranslationStage`, and writer pipeline. You can choose a large language model (LLM) with an OpenAI-compatible endpoint, a local neural machine translation (NMT) service over HTTP, Google Cloud Translation, or Amazon Translate, and optionally run *FAITH*, the translation-quality scoring path built into NeMo Curator, in the same invocation.
+The `nemotron steps translation` command translates selected fields in JSONL or Apache Parquet files.
+You can use a large language model (LLM) with an OpenAI-compatible endpoint, a neural machine translation (NMT) HTTP server, Google Cloud Translation, or Amazon Translate.
+Optionally, you can also run *FAITH* evaluation with an LLM after translation to score translation quality.
 
 :::{tip}
-New here? Start with {doc}`getting-started`, then use this page as the map to deeper topics.
+New here? Read {doc}`using-skills` if you plan to drive the work from a coding agent, then start {doc}`getting-started` and use this page as the map to deeper topics.
 :::
 
 ## When to Use
 
 Use `nemotron steps translation` when you need:
 
-- Localized training or synthetic corpora from translating natural-language fields while preserving structured payloads such as chat turns, tool payloads, and fenced code blocks. Field paths, `output_mode`, and segmentation interact with that behavior; see {doc}`how-to/configure-fields-and-output` and {doc}`explanation/segmentation`.
-- Optional FAITH scoring with configurable thresholds and filtering, without a separate evaluation command-line interface (CLI).
+- Localized training or synthetic corpora from translating natural-language fields while preserving structured payloads such as chat turns, tool payloads, and fenced code blocks.
+  Field paths, `output_mode`, and segmentation interact with that behavior; see {doc}`how-to/configure-fields-and-output` and {doc}`explanation/segmentation`.
+- Optional FAITH evaluation with configurable thresholds and filtering, without a separate evaluation command-line interface (CLI).
 - Repeatable configuration by using the checked-in `default.yaml` plus CLI overrides.
 
 ## Pipeline Summary
@@ -52,6 +55,14 @@ flowchart LR
 Run `nemotron steps translation` end-to-end using `default.yaml` and a sample chat JSONL file.
 +++
 {bdg-secondary}`hands-on`
+:::
+
+:::{grid-item-card} {octicon}`comment-discussion;1.5em;sd-mr-1` Use translation with an agent
+:link: using-skills
+:link-type: doc
+Copy-paste session prompts for supervised fine-tuning (SFT) data or exploratory FAITH scoring, plus habits for a short chat.
++++
+{bdg-secondary}`newcomer`
 :::
 
 :::{grid-item-card} {octicon}`tools;1.5em;sd-mr-1` How-to guides
@@ -88,6 +99,7 @@ YAML parameters and `nemotron steps translation` CLI.
 
 | Guide | What you do |
 |-------|-------------|
+| {doc}`using-skills` | Paste starter prompts for an agent and keep a translation session on the rails |
 | {doc}`getting-started` | Run translation and FAITH using `default.yaml` and sample JSONL |
 
 ```
@@ -136,6 +148,7 @@ YAML parameters and `nemotron steps translation` CLI.
 
 ## Quick Paths
 
-1. First run: {doc}`getting-started`
-2. Swap backend: {doc}`how-to/index`
-3. Lookup flags: {doc}`reference/cli-translation`
+1. Agent-first prompts: {doc}`using-skills`
+2. First run: {doc}`getting-started`
+3. Swap backend: {doc}`how-to/index`
+4. Lookup flags: {doc}`reference/cli-translation`

@@ -12,7 +12,10 @@ content:
 
 # How-To Guides
 
-Task-focused procedures for changing backends, wiring fields, tuning segmentation, and adjusting FAITH. Start from {doc}`../getting-started` if you have not run the step yet.
+This section has task-focused procedures for changing backends, wiring fields, tuning segmentation, and adjusting FAITH.
+
+For copy-paste prompts and habits when you work with a coding agent, read {doc}`../using-skills` first.
+Start with {doc}`../getting-started` if you have not run the step yet.
 
 ```{toctree}
 :maxdepth: 1
