@@ -1,4 +1,3 @@
-
 defaults: ../../grpo_math_1B_megatron.yaml
 
 grpo:
@@ -19,7 +18,7 @@ grpo:
   val_at_start: true
   val_period: 5
   max_val_samples: 256
-  val_batch_size: 32
+  val_batch_size: 256
 
   # ----- DAPO features -----
   use_dynamic_sampling: true
@@ -70,7 +69,7 @@ loss_fn:
 
 checkpointing:
   enabled: true
-  checkpoint_dir: "/shared/checkpoints/dapo17k_nemotron_super_120b_h100_4x8_colocated"
+  checkpoint_dir: "/shared/checkpoints/dapo17k_nemotron_super_120b_h100_4x8_colocated-v2"
   metric_name: "val:accuracy"
   higher_is_better: true
   keep_top_k: 3
@@ -79,7 +78,7 @@ checkpointing:
 
 policy:
   model_name: "/shared/models/NVIDIA-Nemotron-3-Super-120B-A12B-Base-BF16"
-  load_optimizer_from_checkpoint: true
+  load_optimizer_from_checkpoint: false
   tokenizer:
     name: ${policy.model_name}
     # Base Nemotron-Super checkpoints do not ship an instruction chat template.
@@ -107,7 +106,7 @@ policy:
     activation_checkpointing: true
     tensor_model_parallel_size: 8
     pipeline_model_parallel_size: 1
-    context_parallel_size: 1
+    context_parallel_size: 4
     expert_tensor_parallel_size: 1
     expert_model_parallel_size: 32
     pipeline_dtype: ${policy.precision}
@@ -117,7 +116,7 @@ policy:
     defer_fp32_logits: true
     bias_activation_fusion: false
 
-    # MoE routing — all keys read directly (no defaults) by _apply_moe_config in setup.py
+    # MoE routing: all keys are read directly (no defaults) by _apply_moe_config in setup.py.
     moe_token_dispatcher_type: "alltoall"
     moe_permute_fusion: true
     # DeepEP is DeepSeek's custom expert-parallel kernel. Not used here (standard alltoall).
@@ -129,7 +128,7 @@ policy:
     moe_router_load_balancing_type: "none"
     moe_router_enable_expert_bias: true
     moe_router_bias_update_rate: 1.0e-3
-    freeze_moe_router: false       # keep router trainable during RL
+    freeze_moe_router: false       # Keep the router trainable during RL.
     moe_aux_loss_coeff: 0.0
     # Metrics
     track_moe_metrics: true
@@ -154,7 +153,7 @@ policy:
       use_distributed_optimizer: true
       use_precision_aware_optimizer: true
       clip_grad: ${policy.max_grad_norm}
-      optimizer_cpu_offload: false
+      optimizer_cpu_offload: true
       optimizer_offload_fraction: 1.0
 
     scheduler:
@@ -169,7 +168,7 @@ policy:
       use_custom_fsdp: false
       data_parallel_sharding_strategy: "optim_grads_params"
 
-  # Disable the dtensor path for this starter config.
+  # Disable the dtensor path for this getting-started config.
   dtensor_cfg:
     _v2: true
     enabled: false
@@ -196,15 +195,15 @@ policy:
       async_engine: false
       precision: ${policy.precision}
       # Colocated: vLLM shares GPUs with Megatron.
-      # TP=8 (intra-node NVLink), EP=8.
+      # TP=8 (intra-node NVLink), EP=8
       tensor_parallel_size: 8
       pipeline_parallel_size: 1
       expert_parallel_size: 8
-      gpu_memory_utilization: 0.6
+      gpu_memory_utilization: 0.5
       max_model_len: ${policy.max_total_sequence_length}
       enforce_eager: false
       use_deep_gemm: false
-      # Required when vLLM and Megatron share the same tokenizer path; avoids double-init.
+      # Required when vLLM and Megatron share the same tokenizer path; avoids double initialization.
       skip_tokenizer_init: false
       enable_vllm_metrics_logger: true
       vllm_metrics_logger_interval: 0.5
@@ -248,7 +247,7 @@ env:
 logger:
   log_dir: "logs"
   num_val_samples_to_print: 10
-  wandb_enabled: true # set to true if you'd like to have WandB logging
+  wandb_enabled: true # Set to true to enable Weights & Biases logging.
   tensorboard_enabled: false
   mlflow_enabled: false
   swanlab_enabled: false
