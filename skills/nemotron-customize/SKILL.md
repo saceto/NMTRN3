@@ -111,6 +111,11 @@ pipeline workflow:
 5. Return the command first, followed by only the rationale needed to explain
    config/profile choices.
 
+For translation-only command requests, also read
+[src/nemotron/steps/translate/SKILL.md](../../src/nemotron/steps/translate/SKILL.md)
+and return `Decision`, `Config`, `Run`, `Output`, and `Env`. Do not continue
+broad repository exploration once those fields are execution-ready.
+
 Source tiers for command answers:
 
 - **Verified**: CLI, manifest, config, env profile, and dry-run all succeeded.
