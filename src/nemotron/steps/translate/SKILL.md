@@ -5,7 +5,7 @@ description: Translate JSONL or Parquet training corpora with NeMo Curator, incl
 
 # Nemotron Translation
 
-Use this skill when a user wants to translate corpus data, chat records, or row-oriented training artifacts. The concrete step is [`translate/curator`](curator/SKILL.md).
+Use this skill when a user wants to translate corpus data, chat records, or row-oriented training artifacts. The concrete step is [`translate/nemo_curator`](curator/SKILL.md).
 
 ## Default Workflow
 
@@ -55,7 +55,7 @@ FAITH-related outputs, and includes the exact run command and output path.
 Plain text JSONL through a hosted LLM:
 
 ```bash
-uv run --no-sync nemotron steps run translate/curator \
+uv run --no-sync nemotron steps run translate/nemo_curator \
   input_path="$TR_ROOT/news_en" \
   output_dir="$TR_ROOT/out_llm_hi" \
   source_language=en \
@@ -74,7 +74,7 @@ uv run --no-sync nemotron steps run translate/curator \
 Structured chat records:
 
 ```bash
-uv run --no-sync nemotron steps run translate/curator \
+uv run --no-sync nemotron steps run translate/nemo_curator \
   input_path="$TR_ROOT/chat_code_en.jsonl" \
   output_dir="$TR_ROOT/out_chat_hi" \
   source_language=en \
@@ -93,7 +93,7 @@ uv run --no-sync nemotron steps run translate/curator \
 NMT server:
 
 ```bash
-uv run --no-sync nemotron steps run translate/curator \
+uv run --no-sync nemotron steps run translate/nemo_curator \
   input_path="$TR_ROOT/news_en" \
   output_dir="$TR_ROOT/out_nmt_hi" \
   source_language=en \
@@ -137,7 +137,7 @@ uv run --no-sync nemotron steps run translate/curator \
   `pyyaml`, report the blocker and still provide the runnable handoff.
 - Mixed `.jsonl` and `.parquet` roots: bind `input_path` to one format only and
   explicitly state excluded paths or formats.
-- Missing `translate/curator` metadata in a runtime workspace: treat it as
+- Missing `translate/nemo_curator` metadata in a runtime workspace: treat it as
   an environment/path issue, state the blocker, and provide the canonical
   command for a complete checkout.
 - Path-not-found during validation: inspect actual created paths before

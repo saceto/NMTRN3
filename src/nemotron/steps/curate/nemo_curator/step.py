@@ -41,9 +41,7 @@ from nemo_curator.stages.text.classifiers import MultilingualDomainClassifier
 from nemo_curator.stages.text.io.reader import JsonlReader
 from nemo_curator.stages.text.io.writer import JsonlWriter
 
-from nemo_curator.stages.text.filters import FastTextLangId, WordCountFilter
-
-from nemo_curator.stages.text.modules import Filter, ScoreFilter
+from nemo_curator.stages.text.filters import Filter, ScoreFilter
 
 DEFAULT_CONFIG = Path(__file__).parent / "config" / "default.yaml"
 
@@ -75,6 +73,8 @@ def main() -> None:
     pipeline = Pipeline(name="curate_nemo_curator")
     pipeline.add_stage(JsonlReader(file_paths=cfg["input_glob"], fields=[cfg["text_field"]]))
     if allowed_languages:
+        from nemo_curator.stages.text.filters.fasttext import FastTextLangId
+
         pipeline.add_stage(
             ScoreFilter(
                 FastTextLangId(
@@ -96,6 +96,8 @@ def main() -> None:
     if has_word_filter:
         if not all(key in quality_filters for key in ("min_words", "max_words")):
             raise ValueError("quality_filters must set both min_words and max_words to enable WordCountFilter")
+        from nemo_curator.stages.text.filters.heuristic import WordCountFilter
+
         pipeline.add_stage(
             ScoreFilter(
                 WordCountFilter(
