@@ -1440,3 +1440,131 @@ def execute_local(
 
     result = subprocess.run(cmd)
     raise typer.Exit(result.returncode)
+
+
+def execute_uv_local(
+    *,
+    script_path: str,
+    stage_dir: Path,
+    repo_root: Path,
+    train_path: Path,
+    passthrough: list[str],
+    extra_with: list[str] | None = None,
+    extras: list[str] | None = None,
+    pre_script_args: list[str] | None = None,
+) -> None:
+    """Execute a stage script locally via UV using the stage project lock.
+
+    Args:
+        script_path: Relative or absolute path to the stage script.
+        stage_dir: Absolute path to the stage directory (contains pyproject.toml).
+        repo_root: Absolute path to the repo root (installed via ``--with``).
+        train_path: Path to the resolved training config YAML.
+        passthrough: Extra CLI arguments to forward to the script.
+        extra_with: Additional ``--with`` packages for uv run (e.g., ["tensorrt"]).
+        extras: ``[project.optional-dependencies]`` groups to activate on the
+            stage project (e.g., ["tensorrt"] → ``--extra tensorrt``).
+        pre_script_args: Arguments inserted before the script path
+            (e.g., ["-m", "torch.distributed.run", "--nproc_per_node=gpu"]).
+
+    Raises:
+        typer.Exit: with the script's exit code.
+    """
+    import shutil
+
+    uv_cmd = shutil.which("uv")
+    if not uv_cmd:
+        typer.echo("Error: 'uv' command not found. Please install uv.", err=True)
+        raise typer.Exit(1)
+
+    script_path_obj = Path(script_path)
+    script_abs = (
+        script_path_obj
+        if script_path_obj.is_absolute()
+        else stage_dir / script_path_obj
+    )
+    extra_with = list(extra_with or [])
+    extras = list(extras or [])
+    pre_script_args = list(pre_script_args or [])
+
+    cmd = [uv_cmd, "run", "--with", str(repo_root)]
+    for pkg in extra_with:
+        cmd += ["--with", pkg]
+    cmd += ["--project", str(stage_dir)]
+    for extra in extras:
+        cmd += ["--extra", extra]
+
+    if pre_script_args:
+        cmd += [*pre_script_args]
+    else:
+        cmd += ["python"]
+
+    cmd += [str(script_abs), "--config", str(train_path), *passthrough]
+
+    env = os.environ.copy()
+    env.pop("VIRTUAL_ENV", None)
+
+    typer.echo(f"Executing with uv isolated environment: {' '.join(cmd)}")
+    result = subprocess.run(cmd, env=env)
+    raise typer.Exit(result.returncode)
+
+
+def execute_uv_local_from_spec(
+    *,
+    spec: Any,
+    train_path: Path,
+    passthrough: list[str],
+    extra_with: list[str] | None = None,
+    extras: list[str] | None = None,
+    torchrun_nproc_per_node: str | int | None = None,
+) -> None:
+    """Execute a runspec stage locally via UV using ``spec.run.launch``.
+
+    This is a runspec-aware convenience wrapper around ``execute_uv_local``.
+    Stage layout comes from ``spec.script_path`` and launch semantics come from
+    ``spec.run.launch``; caller-provided extras are forwarded unchanged.
+    """
+    script_abs = Path(spec.script_path)
+    stage_dir = script_abs.parent
+    nproc_per_node = torchrun_nproc_per_node
+    if nproc_per_node is None:
+        nproc_per_node = getattr(getattr(spec, "resources", None), "gpus_per_node", 1)
+
+    execute_uv_local(
+        script_path=str(script_abs),
+        stage_dir=stage_dir,
+        repo_root=_find_repo_root_for_script(script_abs),
+        train_path=train_path,
+        passthrough=passthrough,
+        extra_with=extra_with,
+        extras=extras,
+        pre_script_args=_pre_script_args_for_launch(
+            spec.run.launch,
+            torchrun_nproc_per_node=nproc_per_node,
+        ),
+    )
+
+
+def _find_repo_root_for_script(script_path: Path) -> Path:
+    """Find the repository root for a runspec script path."""
+    for parent in script_path.parents:
+        if (parent / "pyproject.toml").exists() and (parent / "src" / "nemotron").exists():
+            return parent
+    return Path.cwd()
+
+
+def _pre_script_args_for_launch(
+    launch: str,
+    *,
+    torchrun_nproc_per_node: str | int,
+) -> list[str]:
+    """Translate runspec launch metadata into args before the script path."""
+    if launch == "torchrun":
+        return [
+            "-m",
+            "torch.distributed.run",
+            f"--nproc_per_node={torchrun_nproc_per_node}",
+        ]
+    if launch in {"direct", "python"}:
+        return []
+    raise ValueError(f"Unsupported local UV launch mode: {launch}")
