@@ -49,6 +49,14 @@ LLM backends (pick one):
      (Qwen3-30B-A3B-Instruct-2507) is not hosted on NVIDIA Build — pass
      --model-name to a model that is.
 
+Note on --tokenizer:
+  The tokenizer is loaded via Hugging Face AutoTokenizer, so --tokenizer
+  must be a Hugging Face repo id (or local path to HF tokenizer files).
+  If --tokenizer is not set, it defaults to --model-name, which in some
+  cases is not a valid HF tokenizer path — e.g. --model-name
+  meta/llama-3.3-70b-instruct needs --tokenizer
+  meta-llama/Llama-3.3-70B-Instruct set explicitly.
+
 Usage:
     # Default: stand up a local inference server (4 GPUs, 4 replicas).
     # Bump --max-concurrent-requests if GPU utilization is low.
