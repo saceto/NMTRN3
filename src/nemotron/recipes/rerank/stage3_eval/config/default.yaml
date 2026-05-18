@@ -35,9 +35,10 @@ k_values:
   - 1
   - 5
   - 10
+  - 100
 
 # Number of first-stage candidates to re-rank
-top_k: 10
+top_k: 100
 
 # Encoding settings
 batch_size: 128
