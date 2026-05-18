@@ -141,14 +141,11 @@ Use it when translation quality needs evidence:
 faith_eval.enabled=true
 faith_eval.filter_enabled=false
 faith_eval.model_name="$FAITH_MODEL"
-faith_eval.generation_config.max_tokens=2048
 ```
 
 Set `faith_eval.filter_enabled=true` only when the user explicitly wants low-quality rows dropped.
 
 FAITH uses an LLM client even when translation uses `nmt`, `google`, or `aws`, so the `server` block still needs a valid endpoint and API key.
-
-Use `faith_eval.generation_config.*` for FAITH scoring generation parameters. Use top-level `generation_config.*` for the translation LLM request.
 
 If the FAITH model returns an empty or invalid response, the run should fail clearly. Treat this as a model or implementation issue, not as successful translation.
 
