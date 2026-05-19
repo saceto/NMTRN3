@@ -102,17 +102,13 @@ class FinetuneConfig(RecipeSettings):
         description="LR decay schedule (cosine, linear).",
     )
     weight_decay: float = Field(default=0.01, ge=0, description="Weight decay for optimizer.")
-    optimizer_backend: Literal["auto", "fused_adam", "flash_adamw", "adamw"] = Field(
+    optimizer_backend: Literal["auto", "fused_adam", "flash_adamw"] = Field(
         default="auto",
         description="Optimizer backend. 'auto' uses FusedAdam when available, otherwise FlashAdamW.",
     )
     flash_adamw_master_weight_bits: Literal[24, 32] = Field(
         default=32,
         description="Effective master-weight precision for FlashAdamW when Transformer Engine is unavailable.",
-    )
-    adamw_model_dtype: Literal["float32", "bfloat16"] = Field(
-        default="float32",
-        description="Model parameter dtype to use with the explicit AdamW backend.",
     )
 
     # Model architecture
@@ -224,7 +220,7 @@ def _load_automodel_config(cfg: FinetuneConfig, config_node_cls: type) -> tuple[
             if te_error:
                 print(f"  Import error: {te_error}", file=sys.stderr)
             print(
-                "  Use optimizer_backend=flash_adamw or adamw for local runs without Transformer Engine.",
+                "  Use optimizer_backend=flash_adamw for local runs without Transformer Engine.",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -233,7 +229,7 @@ def _load_automodel_config(cfg: FinetuneConfig, config_node_cls: type) -> tuple[
             print("Error: optimizer_backend=flash_adamw requires flashoptim.", file=sys.stderr)
             if flash_error:
                 print(f"  Import error: {flash_error}", file=sys.stderr)
-            print("  Use optimizer_backend=adamw for a pure PyTorch fallback.", file=sys.stderr)
+            print("  Install flashoptim, or run in an environment with Transformer Engine FusedAdam.", file=sys.stderr)
             sys.exit(1)
         raw_config["optimizer"] = {
             "_target_": "flashoptim.FlashAdamW",
@@ -248,18 +244,6 @@ def _load_automodel_config(cfg: FinetuneConfig, config_node_cls: type) -> tuple[
         }
         raw_config.setdefault("model", {})["torch_dtype"] = "bfloat16"
         raw_config["model"]["dtype"] = "bfloat16"
-    elif optimizer_backend == "adamw":
-        raw_config["optimizer"] = {
-            "_target_": "torch.optim.AdamW",
-            "lr": raw_config.get("optimizer", {}).get("lr", cfg.learning_rate),
-            "weight_decay": raw_config.get("optimizer", {}).get("weight_decay", cfg.weight_decay),
-            "betas": [0.9, 0.999],
-            "eps": 1.0e-8,
-        }
-        # Automodel's retrieval wrapper consumes torch_dtype; dtype is passed through
-        # to Transformers v5 from_pretrained.
-        raw_config.setdefault("model", {})["torch_dtype"] = cfg.adamw_model_dtype
-        raw_config["model"]["dtype"] = cfg.adamw_model_dtype
 
     return config_node_cls(raw_config), optimizer_backend
 
@@ -334,9 +318,7 @@ def run_finetune(cfg: FinetuneConfig) -> Path:
     # imports during construction, so optimizer selection must happen on raw YAML.
     automodel_cfg, optimizer_backend = _load_automodel_config(cfg, ConfigNode)
     optimizer_detail = optimizer_backend
-    if optimizer_backend == "adamw":
-        optimizer_detail = f"{optimizer_backend} (model dtype={cfg.adamw_model_dtype})"
-    elif optimizer_backend == "flash_adamw":
+    if optimizer_backend == "flash_adamw":
         optimizer_detail = f"{optimizer_backend} (bf16 model, {cfg.flash_adamw_master_weight_bits}-bit master weights)"
     print(f"Optimizer:      {optimizer_detail}")
     print()
