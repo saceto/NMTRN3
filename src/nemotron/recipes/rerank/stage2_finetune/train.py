@@ -200,6 +200,66 @@ def _can_import_flash_adamw() -> tuple[bool, str | None]:
     return True, None
 
 
+def _get_fsdp_shard_mesh_size(mesh: Any) -> int | None:
+    """Return the FSDP shard mesh size for a 1D FSDP or 2D HSDP mesh."""
+    if mesh is None:
+        return None
+    try:
+        mesh_ndim = int(getattr(mesh, "ndim", 1))
+        shard_mesh_dim = 0 if mesh_ndim == 1 else mesh_ndim - 1
+        return int(mesh.size(shard_mesh_dim))
+    except Exception:
+        return None
+
+
+def _patch_flashoptim_fsdp2_shard_placement() -> None:
+    """Shard small 2D heads on dim 1 so FlashOptim DCP checkpoints can save.
+
+    FlashOptim wraps optimizer state tensors as DTensors before DCP save and
+    currently requires the parameter shard dimension to divide evenly. The
+    rerank score head is shaped [num_labels, hidden], commonly [1, hidden],
+    which is uneven on FSDP's default dim-0 sharding across multi-GPU runs.
+    Sharding those 2D parameters on dim 1 keeps FSDP semantics while making the
+    optimizer state checkpointable.
+    """
+    try:
+        import nemo_automodel.components.distributed.parallelizer as parallelizer
+        from torch.distributed.tensor import Shard
+    except Exception:
+        return
+
+    original_fully_shard = getattr(parallelizer, "fully_shard", None)
+    if original_fully_shard is None or getattr(
+        original_fully_shard,
+        "_nemotron_flashoptim_shard_patch",
+        False,
+    ):
+        return
+
+    def fully_shard_with_flashoptim_placement(module: Any, *args: Any, **kwargs: Any) -> Any:
+        mesh = kwargs.get("mesh")
+        user_shard_placement_fn = kwargs.get("shard_placement_fn")
+        shard_mesh_size = _get_fsdp_shard_mesh_size(mesh)
+
+        def shard_placement_fn(param: Any) -> Any:
+            if user_shard_placement_fn is not None:
+                placement = user_shard_placement_fn(param)
+                if placement is not None:
+                    return placement
+
+            if shard_mesh_size and getattr(param, "ndim", 0) >= 2:
+                shape = tuple(param.shape)
+                if shape[0] % shard_mesh_size != 0 and shape[1] % shard_mesh_size == 0:
+                    return Shard(1)
+            return None
+
+        kwargs["shard_placement_fn"] = shard_placement_fn
+        return original_fully_shard(module, *args, **kwargs)
+
+    fully_shard_with_flashoptim_placement._nemotron_flashoptim_shard_patch = True
+    parallelizer.fully_shard = fully_shard_with_flashoptim_placement
+
+
 def _load_automodel_config(cfg: FinetuneConfig, config_node_cls: type) -> tuple[Any, str]:
     """Load Automodel YAML after choosing an optimizer that is importable here."""
     import yaml
@@ -317,6 +377,8 @@ def run_finetune(cfg: FinetuneConfig) -> Path:
     # Load base config from nemo-automodel defaults. ConfigNode resolves _target_
     # imports during construction, so optimizer selection must happen on raw YAML.
     automodel_cfg, optimizer_backend = _load_automodel_config(cfg, ConfigNode)
+    if optimizer_backend == "flash_adamw":
+        _patch_flashoptim_fsdp2_shard_placement()
     optimizer_detail = optimizer_backend
     if optimizer_backend == "flash_adamw":
         optimizer_detail = f"{optimizer_backend} (bf16 model, {cfg.flash_adamw_master_weight_bits}-bit master weights)"
