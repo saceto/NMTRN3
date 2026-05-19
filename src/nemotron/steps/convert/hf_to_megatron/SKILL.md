@@ -23,6 +23,8 @@ parameters, strategies, and failure modes.
 - Set `megatron_path` to a new output directory.
 - Keep `dtype=bfloat16` for typical Nemotron/NVIDIA checkpoints unless a source
   model requires another dtype.
+- Set `device_map` only when the installed Megatron-Bridge/Transformers stack
+  expects one for local loading.
 - Merge LoRA adapters before importing them into Megatron layout.
 
 ## Guardrails
