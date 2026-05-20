@@ -21,13 +21,15 @@ def test_auto_optimizer_uses_fused_adam_when_available(monkeypatch: pytest.Monke
     raw_config, optimizer_backend = train._load_automodel_config(train.FinetuneConfig(), _as_dict)
 
     assert optimizer_backend == "fused_adam"
-    assert raw_config["model"]["_target_"] == (
-        "nemo_automodel._transformers.auto_model.NeMoAutoModelBiEncoder.from_pretrained"
-    )
+    assert raw_config["recipe"] == "TrainBiEncoderRecipe"
+    assert raw_config["model"]["_target_"] == "nemo_automodel.NeMoAutoModelBiEncoder.from_pretrained"
+    assert raw_config["tokenizer"]["_target_"] == "nemo_automodel.NeMoAutoTokenizer.from_pretrained"
+    assert raw_config["tokenizer"]["add_eos_token"] is False
     assert raw_config["dataloader"]["dataset"]["n_passages"] == 5
     assert raw_config["dataloader"]["collate_fn"]["_target_"] == (
         "nemo_automodel.components.datasets.llm.BiEncoderCollator"
     )
+    assert raw_config["distributed"]["strategy"] == "fsdp2"
     assert raw_config["optimizer"]["_target_"] == (
         "transformer_engine.pytorch.optimizers.fused_adam.FusedAdam"
     )
