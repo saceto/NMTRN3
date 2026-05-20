@@ -356,7 +356,7 @@ entity = "my-team"
 # Local Docker execution profile
 [local-docker]
 executor = "docker"
-container_image = "nvcr.io/nvidia/pytorch:25.01-py3"
+container_image = "nvcr.io/nvidia/nemo-automodel:26.04"
 runtime = "nvidia"  # Enable GPU passthrough
 ipc_mode = "host"
 shm_size = "16g"
@@ -371,7 +371,7 @@ executor = "slurm"
 account = "my-account"
 partition = "interactive"
 batch_partition = "batch"
-container_image = "nvcr.io/nvidia/pytorch:25.01-py3"
+container_image = "nvcr.io/nvidia/nemo-automodel:26.04"
 tunnel = "ssh"
 host = "cluster.example.com"
 user = "username"
@@ -451,6 +451,8 @@ base_model: nvidia/llama-nemotron-embed-1b-v2
 num_epochs: 3
 global_batch_size: 128
 learning_rate: 1.0e-5
+optimizer_backend: auto        # FusedAdam in Automodel container, FlashAdamW fallback
+flash_adamw_master_weight_bits: 32
 query_max_length: 512          # Max query tokens (check your base model's max sequence length)
 passage_max_length: 512        # Max passage tokens (check your base model's max sequence length)
 # attn_implementation: null    # Auto-detects flash_attention_2 if available, else sdpa
