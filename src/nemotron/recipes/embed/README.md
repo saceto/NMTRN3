@@ -448,6 +448,7 @@ test_ratio: 0.1                # Test split (10%)
 **Stage 2: Finetune**
 ```yaml
 base_model: nvidia/llama-nemotron-embed-1b-v2
+trust_remote_code: true
 num_epochs: 3
 global_batch_size: 128
 learning_rate: 1.0e-5

@@ -83,6 +83,10 @@ class FinetuneConfig(RecipeSettings):
         default="nvidia/llama-nemotron-embed-1b-v2",
         description="Base embedding model to fine-tune.",
     )
+    trust_remote_code: bool = Field(
+        default=True,
+        description="Allow Hugging Face custom model code. Required by the default Nemotron Embed model.",
+    )
 
     # Data paths
     train_data_path: Path = Field(
@@ -379,6 +383,8 @@ def run_finetune(cfg: FinetuneConfig) -> Path:
     # Model settings
     automodel_cfg.model.pretrained_model_name_or_path = cfg.base_model
     automodel_cfg.tokenizer.pretrained_model_name_or_path = cfg.base_model
+    automodel_cfg.model.trust_remote_code = cfg.trust_remote_code
+    automodel_cfg.tokenizer.trust_remote_code = cfg.trust_remote_code
     # Auto-detect attention implementation if not explicitly set
     if cfg.attn_implementation is not None:
         attn_impl = cfg.attn_implementation

@@ -18,6 +18,7 @@ run:
 
 # Base embedding model to fine-tune
 base_model: nvidia/llama-nemotron-embed-1b-v2
+trust_remote_code: true
 
 # Path to training data (output from stage1_data_prep)
 train_data_path: ./output/embed/stage1_data_prep/train_mined.automodel_unrolled.json
