@@ -78,16 +78,7 @@ Use this skill to work with Nemotron embedding and reranking fine-tuning recipes
 - `references/rerank.md`: rerank recipe stages, commands, defaults, output paths, and operating patterns.
 - `references/evaluation.md`: metric interpretation, comparison hygiene, and deployment readiness checks.
 - `references/remote.md`: remote execution profiles, batch/run mode, GPU scoping, logs, and polling.
-- `scripts/check-command-freshness.sh`: read-only CLI help and dry-run checks for documented examples.
 - `PITFALLS.md`: common failures and recovery moves for SDG, prep, training, eval, export, deploy, and CLI setup.
-
-## Available Scripts
-
-| Script | Purpose | Arguments |
-| --- | --- | --- |
-| `scripts/check-command-freshness.sh` | Runs read-only `uv run --no-sync` help and dry-run checks for documented CLI examples. | Optional repo root path; defaults to the git root or current directory. |
-
-When your runtime supports skill script helpers, use `run_script("scripts/check-command-freshness.sh", ["/path/to/repo"])`; otherwise run `.agents/skills/retriever-finetune-recipe/scripts/check-command-freshness.sh /path/to/repo` from shell.
 
 ## Example Usage
 

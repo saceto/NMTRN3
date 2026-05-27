@@ -164,5 +164,4 @@ curl -X POST http://localhost:8000/v1/embeddings \
 uv run nemotron embed --help
 uv run nemotron embed finetune -c default -d
 uv run pytest tests/recipes/embed tests/nemo_runspec/test_execution_uv_spec.py -q
-.agents/skills/retriever-finetune-recipe/scripts/check-command-freshness.sh
 ```

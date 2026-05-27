@@ -30,7 +30,7 @@ Static validation also uses deterministic skill-quality checks.
 
 ## Test Tasks
 
-The dataset contains 8 realistic task cases in `evals/evals.json`:
+The dataset contains 12 realistic task cases in `evals/evals.json`:
 
 | Task | Type |
 | --- | --- |
@@ -42,13 +42,17 @@ The dataset contains 8 realistic task cases in `evals/evals.json`:
 | `retriever-finetune-recipe-secret-handling-001` | Positive: secret-safe Stage 0 planning |
 | `retriever-finetune-recipe-stale-artifacts-001` | Positive: stale artifact diagnosis |
 | `retriever-finetune-recipe-prereq-gap-001` | Positive: prerequisite gate before GPU work |
+| `retriever-finetune-recipe-remote-batch-001` | Positive: remote batch planning |
+| `retriever-finetune-recipe-metrics-nuance-001` | Positive: nuanced metrics interpretation |
+| `retriever-finetune-recipe-stage-readiness-001` | Positive: stage readiness from raw docs |
+| `retriever-finetune-recipe-export-boundary-001` | Positive: TensorRT export boundary debugging |
 
 ## Results
 
 | Metric | Num | Codex | Claude Code |
 | --- | ---: | --- | --- |
 | Static quality score | 1 skill | 100/100 | Not agent-specific |
-| Command freshness | 8 commands | Passed in current checkout | Not agent-specific |
+| Command freshness checklist | 6 representative commands | Passed manually in current checkout | Not agent-specific |
 | Live overall score (original set) | 4 tasks | 0.90 with skill vs 0.66 without skill (+0.24) | Pending |
 | Security (original set) | 4 tasks | 1.00 | Pending |
 
@@ -58,6 +62,6 @@ A follow-up design iteration used three Codex-native trace-bundle trials: one ba
 
 ## Notes
 
-The eval setup compares with-skill and without-skill performance, keeps generated `evals/results/` output out of source control, and uses task prompts that do not explicitly name the skill. The four newer cases expand adversarial coverage; rerun live evaluation before replacing the original-set aggregate scores. The committed `evals/evals.json` file is the reusable test dataset; aggregate results are summarized here rather than committing full run directories or raw provider traces.
+The eval setup compares with-skill and without-skill performance, keeps generated `evals/results/` output out of source control, and uses task prompts that do not explicitly name the skill. The eight newer cases expand adversarial coverage; rerun live evaluation before replacing the original-set aggregate scores. The committed `evals/evals.json` file is the reusable test dataset; aggregate results are summarized here rather than committing full run directories or raw provider traces.
 
 The Claude Code run is not recorded here yet because live evaluation sends workspace skill/eval content to configured model providers and requires explicit approval in this environment.

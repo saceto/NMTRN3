@@ -9,7 +9,7 @@ The evaluation is functional: it checks whether agents use the skill when retrie
 ## Dataset Rules
 
 - Keep prompts realistic. Do not name the skill in user prompts.
-- Include positive cases for embedding planning, reranker selection, deployment debugging, stale artifact diagnosis, secret-safe setup, and prerequisite gating.
+- Include positive cases for embedding planning, reranker selection, deployment debugging, stale artifact diagnosis, secret-safe setup, prerequisite gating, remote execution, metric interpretation, stage readiness, and export/deploy boundary debugging.
 - Include negative cases where the skill should not activate, including unrelated factual questions and generic vector database advice.
 - Keep `expected_skill`, `ground_truth`, and ordered `expected_behavior` entries explicit enough for deterministic and judge-based grading.
 - Do not commit generated `evals/results/` output; commit only reusable fixtures and summary reports.
@@ -20,11 +20,24 @@ Before publication, run the configured skill evaluation harness in the configure
 
 - validate the skill and eval dataset structure,
 - run static skill-quality checks,
-- run `.agents/skills/retriever-finetune-recipe/scripts/check-command-freshness.sh` when the checkout has the recipe CLI installed,
+- verify documented command examples with read-only `uv run --no-sync ... --help` and `-d` dry-runs when the checkout has the recipe CLI installed,
 - run live with-skill and without-skill evaluation,
 - cover both Codex and Claude Code, or document why an agent was skipped.
 
 The live evaluation sends skill and eval prompts to the configured model providers. Get explicit approval before running it in an environment where workspace content is sensitive.
+
+## Command Freshness Checklist
+
+Use the current checkout rather than memory. Run the smallest relevant subset of these commands when recipe CLI drift is a concern:
+
+```bash
+uv run --no-sync nemotron embed --help
+uv run --no-sync nemotron embed run -c default -d --from sdg --to prep
+uv run --no-sync nemotron embed run -c default -d --from prep --to eval
+uv run --no-sync nemotron rerank --help
+uv run --no-sync nemotron rerank run -c default -d --from prep --to eval
+uv run --no-sync nemotron rerank eval -c default -d eval_nim=true eval_base=false
+```
 
 ## Reporting
 

@@ -160,5 +160,4 @@ curl -X POST http://localhost:8000/v1/ranking \
 uv run nemotron rerank --help
 uv run nemotron rerank finetune -c default -d
 uv run pytest src/nemotron/recipes/rerank/stage2_finetune/tests tests/nemo_runspec/test_execution_uv_spec.py -q
-.agents/skills/retriever-finetune-recipe/scripts/check-command-freshness.sh
 ```
