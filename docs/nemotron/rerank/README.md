@@ -86,12 +86,12 @@ The two models are complementary — use the embedding model to cast a wide net,
 
 | Stage | Command | Description | Output |
 |-------|---------|-------------|--------|
-| [Stage 0: SDG](./stage0_sdg/) | `nemotron rerank sdg` | Validate corpus, generate synthetic Q&A pairs from documents | Q&A pairs with quality scores |
-| [Stage 1: Data Prep](./stage1_prep/) | `nemotron rerank prep` | Convert, mine hard negatives, unroll | Training-ready data |
-| [Stage 2: Finetune](./stage2_finetune/) | `nemotron rerank finetune` | Fine-tune cross-encoder reranking model | Model checkpoint |
-| [Stage 3: Eval](./stage3_eval/) | `nemotron rerank eval` | Evaluate reranking improvement over first-stage retrieval | Metrics comparison |
-| [Stage 4: Export](./stage4_export/) | `nemotron rerank export` | Export to ONNX/TensorRT | Optimized inference models |
-| [Stage 5: Deploy](./stage5_deploy/) | `nemotron rerank deploy` | Deploy NIM ranking service | Running inference service |
+| Stage 0: SDG | `nemotron rerank sdg` | Validate corpus, generate synthetic Q&A pairs from documents | Q&A pairs with quality scores |
+| Stage 1: Data Prep | `nemotron rerank prep` | Convert, mine hard negatives, unroll | Training-ready data |
+| Stage 2: Finetune | `nemotron rerank finetune` | Fine-tune cross-encoder reranking model | Model checkpoint |
+| Stage 3: Eval | `nemotron rerank eval` | Evaluate reranking improvement over first-stage retrieval | Metrics comparison |
+| Stage 4: Export | `nemotron rerank export` | Export to ONNX/TensorRT | Optimized inference models |
+| Stage 5: Deploy | `nemotron rerank deploy` | Deploy NIM ranking service | Running inference service |
 
 ## Installation
 
@@ -409,6 +409,8 @@ Each stage has a `config/` directory with YAML configuration files.
 | `default.yaml` | Production-ready configuration |
 
 ### Key Configuration Options
+
+The default config points at a small pinned sample corpus. For your own corpus, override the Stage 0 paths:
 
 **Stage 0: SDG**
 ```yaml

@@ -12,4 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Stage 3: Deploy NIM reranker service."""
+"""Stage 5: Deploy NIM reranker service."""

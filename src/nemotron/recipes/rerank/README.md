@@ -410,6 +410,8 @@ Each stage has a `config/` directory with YAML configuration files.
 
 ### Key Configuration Options
 
+The default config points at a small pinned sample corpus. For your own corpus, override the Stage 0 paths:
+
 **Stage 0: SDG**
 ```yaml
 corpus_id: my_corpus           # Identifier for your corpus

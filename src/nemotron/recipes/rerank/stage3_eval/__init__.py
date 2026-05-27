@@ -12,4 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Stage 1: Evaluate cross-encoder reranking models."""
+"""Stage 3: Evaluate cross-encoder reranking models."""
