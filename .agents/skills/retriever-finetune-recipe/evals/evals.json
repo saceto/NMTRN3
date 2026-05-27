@@ -4,7 +4,7 @@
     "question": "I have domain docs ready and want to run a small first pass of `nemotron embed` fine-tuning. Help me choose the stages, prerequisites, and safest dry-run command before I spend GPU time.",
     "expected_skill": "retriever-finetune-recipe",
     "expected_script": null,
-    "ground_truth": "The agent should use the retriever-finetune-recipe skill, identify this as an embedding recipe planning task, avoid starting expensive work, mention prerequisites such as repo extras, NVIDIA_API_KEY for SDG, and GPU/CUDA for later stages, and propose a dry-run such as `uv run nemotron embed run -c default -d --from sdg --to eval` or another safe stage-specific preview.",
+    "ground_truth": "The agent should use the retriever-finetune-recipe skill, identify this as an embedding recipe planning task, avoid starting expensive work, mention prerequisites such as repo extras, NVIDIA_API_KEY for SDG, and GPU/CUDA for later stages, and propose a dry-run such as `uv run nemotron embed run -c default -d --from sdg --to prep` for raw docs, `uv run nemotron embed run -c default -d --from prep --to eval` for existing pairs, or another safe stage-specific preview.",
     "expected_behavior": [
       "The agent read the retriever-finetune-recipe SKILL.md before taking action",
       "The agent routed to embedding guidance rather than reranking guidance",

@@ -35,6 +35,18 @@ uv run nemotron embed --help
 uv run nemotron embed run -c default -d --from prep --to eval
 ```
 
+For raw domain documents, preview only data generation and prep before any training plan:
+
+```bash
+uv run nemotron embed run -c default -d --from sdg --to prep
+```
+
+If training/eval pairs already exist, skip SDG and preview prep through eval:
+
+```bash
+uv run nemotron embed run -c default -d --from prep --to eval
+```
+
 Stage commands:
 
 ```bash

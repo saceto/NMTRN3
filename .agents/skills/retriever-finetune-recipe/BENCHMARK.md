@@ -47,6 +47,10 @@ The dataset contains 4 realistic task cases in `evals/evals.json`:
 | Live overall score | 4 tasks | 0.90 with skill vs 0.66 without skill (+0.24) | Pending |
 | Security | 4 tasks | 1.00 | Pending |
 
+## Experiential Design Iteration
+
+A follow-up design iteration used three Codex-native trace-bundle trials: one baseline rerank-selection task without the skill, one with-skill embedding first-pass planning task, and one with-skill rerank NIM deployment-debug task. MCP-backed trajectory review was not available, so the review used saved trace bundles instead. Two trials produced partial trajectory evidence because their subagent command runner could not spawn shell processes; the deployment-debug trial produced complete trace evidence with source/config inspection, CLI help, and dry-runs. The reusable deltas from those traces were folded into the skill references and pitfalls.
+
 ## Notes
 
 The eval setup compares with-skill and without-skill performance, keeps generated `evals/results/` output out of source control, and uses task prompts that do not explicitly name the skill. The committed `evals/evals.json` file is the reusable test dataset; aggregate results are summarized here rather than committing full run directories or raw provider traces.

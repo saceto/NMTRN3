@@ -129,6 +129,10 @@ Stage 5:
 - Keep the Stage 2 `prompt_template` and Stage 3 eval `prompt_template` identical.
 - Inspect existing `output/rerank/` artifacts before rerunning a stage. Ask before deleting checkpoints, cached embeddings, or generated data.
 
+## Rerank NIM Eval Drift Checklist
+
+When served rerank metrics are worse than checkpoint metrics, find the first boundary where quality changes: checkpoint eval, ONNX export, TensorRT export, then served NIM. Keep the Stage 3 `eval_data_path`, retrieval model, `top_k`, prefixes, `prompt_template`, and `max_length` fixed across comparisons. Verify Stage 4 exports the exact checkpoint path that Stage 3 evaluated, usually `output/rerank/stage2_finetune/checkpoints/LATEST/model/consolidated`. Start with ONNX parity before TensorRT; if ONNX matches but TensorRT drops, inspect `export_to_trt`, `quant_cfg`, TensorRT sequence profiles, and layernorm FP32 settings. For deploy, confirm `model_dir` and `use_onnx` match the intended `stage4_export/onnx` or `stage4_export/tensorrt` artifact, not a stale or base-model mount.
+
 ## NIM Smoke Test
 
 ```bash

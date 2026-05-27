@@ -6,6 +6,7 @@ Load this file when a recipe command fails, metrics look wrong, or the user asks
 
 - CLI help or dry-run fails before reaching `embed` or `rerank` with a missing optional dependency: run the repo's documented sync path, usually `uv sync --all-extras`. If the error names Data Designer, the smaller recovery may be `uv sync --extra data-sdg`.
 - `uv run` rebuilds or installs packages unexpectedly: report that the environment is being prepared, then continue with help/dry-run before launching work.
+- In an already synced checkout, use `uv run --no-sync ...` for help and dry-runs when you want to avoid dependency changes; if dependencies are missing, fall back to the documented sync path.
 - CUDA symbol, `nvJitLink`, or library mismatch errors: clear inherited CUDA library paths with `LD_LIBRARY_PATH=""` for the command, then rerun the cheapest failing validation.
 - Unknown override field: inspect the stage config model or `uv run nemotron <family> <stage> --help`; Pydantic configs usually reject extra fields.
 - Hugging Face `429 Too Many Requests` or gated-model access errors: set `HF_TOKEN`, run `huggingface-cli login`, or reduce parallel work before retrying.
@@ -40,6 +41,7 @@ Load this file when a recipe command fails, metrics look wrong, or the user asks
 - Reranker cannot improve recall: a reranker only reorders retrieved candidates. If relevant documents are missing from `top_k`, tune the embedder or retrieval index.
 - Metrics look noisy: increase held-out eval queries where possible and compare on a fixed `eval_beir/` split.
 - NIM eval mismatch: compare checkpoint vs ONNX vs TensorRT, then inspect quantization, pooling/normalization, prefixes, prompt template, and sequence lengths.
+- If rerank NIM eval regresses, freeze the same Stage 3 `eval_data_path`, retrieval model, `top_k`, prefixes, `prompt_template`, and `max_length`; then verify the Stage 4 `model_path` is the exact checkpoint evaluated and Stage 5 `model_dir`/`use_onnx` points at the intended ONNX or TensorRT export.
 
 ## Stage 4 Export
 

@@ -55,6 +55,8 @@ Use this skill to work with Nemotron embedding and reranking fine-tuning recipes
    - `uv run nemotron <family> <stage> --help`
    - `uv run nemotron <family> <stage> -c default -d`
    - `uv run nemotron <family> run -c default -d --from <stage> --to <stage>`
+   - `run --help` may omit inherited `-c` and `-d` options even though `run -c default -d ...` works; validate by running the dry-run when unsure.
+   - In an already prepared checkout, `uv run --no-sync ... --help` or `uv run --no-sync ... -d` can avoid unexpected dependency sync during read-only checks.
 3. Check prerequisites for the requested stage:
    - Repo environment: `uv sync --all-extras` or the smallest relevant extra if documented by the repo.
    - Stage 0 SDG: `NVIDIA_API_KEY`.
