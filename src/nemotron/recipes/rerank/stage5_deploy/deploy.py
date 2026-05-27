@@ -30,20 +30,23 @@
 
 """Deploy script for NVIDIA NeMo Retriever Reranking NIM.
 
-Launches the NVIDIA Reranking NIM container. The Reranking NIM supports
-custom assets through documented NIM manifest/profile environment variables;
-raw ONNX/TensorRT directories are not mounted as an undocumented custom-model
-path.
+Launches the NVIDIA Reranking NIM container. By default the exported Stage 4
+ONNX model directory is mounted into the container and exposed through
+NIM_CUSTOM_MODEL. The NIM discovers the mounted custom model at startup and
+creates its runtime manifest automatically.
 
 Usage:
-    # Launch stock NIM in foreground
+    # Launch with the Stage 4 ONNX export in foreground
     nemotron rerank deploy -c default
 
     # Detached mode (background)
     nemotron rerank deploy -c default detach=true
 
-    # Use a custom NIM manifest
-    nemotron rerank deploy -c default nim_manifest_path=/path/to/model_manifest.yaml
+    # Use a TensorRT export instead
+    nemotron rerank deploy -c default model_dir=/path/to/stage4_export/tensorrt
+
+    # Serve the image default model
+    nemotron rerank deploy -c default model_dir=null
 """
 
 from __future__ import annotations
@@ -87,27 +90,18 @@ class DeployConfig(RecipeSettings):
     container_name: str = Field(default="nemotron-rerank-nim", description="Name for the Docker container.")
     replace_existing: bool = Field(default=False, description="Replace an existing container created by this recipe.")
 
-    # Optional NIM model selection. Reranking NIM uses documented manifest/profile
-    # env vars; it does not support a raw NIM_CUSTOM_MODEL directory.
+    # Optional NIM model selection. A custom ONNX/TensorRT export directory is
+    # mounted and advertised via NIM_CUSTOM_MODEL. NIM discovers the artifact and
+    # creates its runtime manifest during startup.
     model_dir: Path | None = Field(
-        default_factory=lambda: _OUTPUT_BASE / "output/rerank/stage4_export",
-        description="Optional directory containing model_manifest.yaml and NIM model assets.",
-    )
-    nim_manifest_path: Path | None = Field(
-        default=None,
-        description="Optional host path to a NIM model manifest YAML file.",
-    )
-    nim_model_profile: str | None = Field(
-        default=None, description="Optional NIM_MODEL_PROFILE value to select a model profile."
-    )
-    nim_served_model_name: str | None = Field(
-        default=None, description="Optional NIM_SERVED_MODEL_NAME value for API model aliases."
+        default_factory=lambda: _OUTPUT_BASE / "output/rerank/stage4_export/onnx",
+        description="Optional host directory containing an exported ONNX or TensorRT model artifact.",
     )
 
     # Container paths
     container_model_path: str = Field(
         default="/opt/nim/custom_model",
-        description="Container mount path for custom NIM manifest assets.",
+        description="Container mount path for the custom exported model artifact.",
     )
     container_cache_path: str = Field(default="/opt/nim/.cache", description="Path inside container for NIM cache.")
 
@@ -206,14 +200,6 @@ def stop_existing_container(container_name: str, replace_existing: bool) -> None
     subprocess.run(["docker", "rm", container_name], capture_output=True)
 
 
-def _resolve_manifest_path(cfg: DeployConfig) -> Path | None:
-    """Resolve a custom NIM manifest path from explicit path or model_dir."""
-    if cfg.nim_manifest_path is not None:
-        return cfg.nim_manifest_path
-    if cfg.model_dir is None:
-        return None
-    return cfg.model_dir / "model_manifest.yaml"
-
 
 def _format_command(cmd: list[str]) -> str:
     """Return a shell-escaped command string with no secret values embedded."""
@@ -235,7 +221,7 @@ def _api_base_url(cfg: DeployConfig) -> str:
     return f"http://{_client_host(cfg.bind_address)}:{cfg.host_port}"
 
 
-def build_docker_command(cfg: DeployConfig, manifest_path: Path | None) -> tuple[list[str], dict[str, str]]:
+def build_docker_command(cfg: DeployConfig) -> tuple[list[str], dict[str, str]]:
     """Build the Docker run command and environment."""
     cmd = ["docker", "run"]
     docker_env = os.environ.copy()
@@ -266,15 +252,10 @@ def build_docker_command(cfg: DeployConfig, manifest_path: Path | None) -> tuple
 
     cmd.extend(["-e", f"NIM_HTTP_API_PORT={cfg.container_port}"])
     cmd.extend(["-e", f"NIM_CACHE_PATH={cfg.container_cache_path}"])
-    if cfg.nim_model_profile:
-        cmd.extend(["-e", f"NIM_MODEL_PROFILE={cfg.nim_model_profile}"])
-    if cfg.nim_served_model_name:
-        cmd.extend(["-e", f"NIM_SERVED_MODEL_NAME={cfg.nim_served_model_name}"])
-
-    if manifest_path is not None:
-        manifest_abs = manifest_path.resolve()
-        cmd.extend(["-v", f"{manifest_abs.parent}:{cfg.container_model_path}:ro"])
-        cmd.extend(["-e", f"NIM_MANIFEST_PATH={cfg.container_model_path}/{manifest_abs.name}"])
+    if cfg.model_dir is not None:
+        model_dir_abs = cfg.model_dir.resolve()
+        cmd.extend(["-v", f"{model_dir_abs}:{cfg.container_model_path}:ro"])
+        cmd.extend(["-e", f"NIM_CUSTOM_MODEL={cfg.container_model_path}"])
 
     cache_dir = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
     nim_cache = Path(cache_dir) / "nim"
@@ -313,8 +294,6 @@ def wait_for_health(cfg: DeployConfig) -> bool:
 
 def run_deploy(cfg: DeployConfig) -> dict:
     """Run NIM reranker deployment."""
-    manifest_path = _resolve_manifest_path(cfg)
-
     print("NIM Reranking Service Deployment")
     print("=" * 60)
     print(f"NIM image:       {cfg.nim_image}")
@@ -323,10 +302,8 @@ def run_deploy(cfg: DeployConfig) -> dict:
     print(f"Container port:  {cfg.container_port}")
     print(f"GPUs:            {cfg.gpus}")
     print(f"Detached:        {cfg.detach}")
-    if manifest_path is not None:
-        print(f"NIM manifest:    {manifest_path}")
-    elif cfg.nim_model_profile:
-        print(f"NIM profile:     {cfg.nim_model_profile}")
+    if cfg.model_dir is not None:
+        print(f"Custom model:    {cfg.model_dir}")
     else:
         print("NIM model:       image default")
     print("=" * 60)
@@ -341,21 +318,16 @@ def run_deploy(cfg: DeployConfig) -> dict:
 
     if cfg.model_dir is not None and not cfg.model_dir.exists():
         print(f"Error: model_dir not found: {cfg.model_dir}", file=sys.stderr)
-        sys.exit(1)
-
-    if manifest_path is not None and not manifest_path.exists():
-        print(f"Error: NIM manifest not found: {manifest_path}", file=sys.stderr)
         print(
-            "       Reranking NIM does not support raw ONNX/TensorRT directories through NIM_CUSTOM_MODEL.",
+            "       Run rerank export first, or set model_dir=null to serve the image default model.",
             file=sys.stderr,
         )
-        print("       Provide nim_manifest_path or a model_dir containing model_manifest.yaml.", file=sys.stderr)
         sys.exit(1)
 
     print("Stopping existing recipe-owned container (if any)...")
     stop_existing_container(cfg.container_name, cfg.replace_existing)
 
-    docker_cmd, docker_env = build_docker_command(cfg, manifest_path)
+    docker_cmd, docker_env = build_docker_command(cfg)
     print("Starting NIM container...")
     print(f"   Command: {_format_command(docker_cmd)}")
     print()
@@ -365,8 +337,8 @@ def run_deploy(cfg: DeployConfig) -> dict:
         "host_port": cfg.host_port,
         "api_url": f"{_api_base_url(cfg)}/v1/ranking",
     }
-    if manifest_path is not None:
-        result["nim_manifest_path"] = str(manifest_path)
+    if cfg.model_dir is not None:
+        result["model_dir"] = str(cfg.model_dir)
 
     if cfg.detach:
         proc = subprocess.run(docker_cmd, capture_output=True, text=True, env=docker_env)

@@ -1643,7 +1643,8 @@ def execute_uv_local(
     repo_root = Path(repo_root)
     script = Path(script_path)
     if not script.is_absolute():
-        script = stage_dir / script
+        repo_script = repo_root / script
+        script = repo_script if repo_script.exists() else stage_dir / script
 
     cmd = [uv_cmd, "run", "--with", str(repo_root)]
     for item in extra_with or []:

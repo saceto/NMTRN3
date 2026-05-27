@@ -34,8 +34,7 @@ import argparse
 import hashlib
 import glob
 import random
-from pathlib import Path
-from typing import Dict, List, Tuple, Any, Set
+from typing import Dict, List, Tuple, Any
 import pandas as pd
 import numpy as np
 
@@ -167,7 +166,7 @@ def filter_qa_pairs_by_quality(
     filtered_df = pd.DataFrame(all_filtered_qa_pairs)
 
     # Print statistics
-    print(f"\nQuality Filtering Results:")
+    print("\nQuality Filtering Results:")
     print(f"  Total QA pairs: {total_pairs}")
     print(f"  Filtered out (score < {quality_threshold}): {filtered_pairs}")
     print(f"  Remaining high-quality pairs: {len(filtered_df)}")
@@ -301,21 +300,20 @@ def load_generated_json_files(input_path: str) -> pd.DataFrame:
         # Single file mode (merged JSON)
         print(f"Loading single JSON file: {input_path}")
         with open(input_path, 'r', encoding='utf-8') as f:
-            first_char = f.read(1)
-            f.seek(0)
-            if first_char == '[':
-                # Standard JSON array
-                records = json.load(f)
-                if isinstance(records, list):
-                    all_records.extend(records)
-                else:
-                    all_records.append(records)
+            content = f.read()
+        try:
+            records = json.loads(content)
+        except json.JSONDecodeError:
+            # JSONL: one JSON object per line
+            for line in content.splitlines():
+                line = line.strip()
+                if line:
+                    all_records.append(json.loads(line))
+        else:
+            if isinstance(records, list):
+                all_records.extend(records)
             else:
-                # JSONL: one JSON object per line
-                for line in f:
-                    line = line.strip()
-                    if line:
-                        all_records.append(json.loads(line))
+                all_records.append(records)
     else:
         # Folder mode (batch files)
         json_files = sorted(glob.glob(os.path.join(input_path, 'generated_batch*.json')))
@@ -838,10 +836,10 @@ def main():
     print(f"Output directory: {output_dir}")
     print(f"Corpus ID: {args.corpus_id}")
     if args.eval_only:
-        print(f"Mode: Evaluation only (BEIR format)")
+        print("Mode: Evaluation only (BEIR format)")
     else:
         test_ratio = 1.0 - args.train_ratio - args.val_ratio
-        print(f"Mode: Train/Val/Test split")
+        print("Mode: Train/Val/Test split")
         print(f"Split ratios: train={args.train_ratio}, val={args.val_ratio}, test={test_ratio:.2f}")
     print(f"Random seed: {args.seed}")
     print(f"Quality threshold: {args.quality_threshold}")

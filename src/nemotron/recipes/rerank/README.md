@@ -233,12 +233,12 @@ nemotron rerank finetune -c default
 # Stage 3: Evaluate base vs fine-tuned reranker
 nemotron rerank eval -c default
 
-# Stage 4: Export to ONNX/TensorRT for conversion checks or NIM packaging
+# Stage 4: Export to ONNX/TensorRT for NIM deployment
 nemotron rerank export -c default
 
-# Optional Stage 5: Deploy NeMo Retriever Reranking NIM once a NIM manifest is available.
-# Deploy looks for ./output/rerank/stage4_export/model_manifest.yaml by default;
-# provide nim_manifest_path if the NIM packaging step writes it elsewhere.
+# Optional Stage 5: Deploy NeMo Retriever Reranking NIM with the Stage 4 ONNX export.
+# Deploy mounts ./output/rerank/stage4_export/onnx by default; set model_dir to
+# the tensorrt directory if you exported a TensorRT engine.
 nemotron rerank deploy -c default detach=true
 
 # Optional: Verify NIM accuracy matches checkpoint
@@ -263,7 +263,7 @@ Stages are designed to run sequentially, but you can start from any stage if you
 | **Stage 2** | Training data (Automodel format) | Skip data prep if data is ready |
 | **Stage 3** | Model checkpoint | Evaluate existing checkpoint |
 | **Stage 4** | Model checkpoint | Export existing model |
-| **Stage 5** | Reranking NIM image; optional NIM model manifest | Deploy the ranking API |
+| **Stage 5** | Reranking NIM image; ONNX or TensorRT export directory | Deploy the ranking API |
 
 See individual stage configs for input format requirements.
 
@@ -310,7 +310,7 @@ Run inside a Docker container with GPU passthrough using `--run local-docker`:
 # Runs the command inside a Docker container with GPU access
 nemotron rerank finetune -c default --run local-docker
 
-# All stages support Docker execution
+# Stage commands through export can run in Docker; deploy is a local-only Docker wrapper.
 nemotron rerank sdg -c default --run local-docker
 nemotron rerank prep -c default --run local-docker
 nemotron rerank eval -c default --run local-docker
@@ -485,9 +485,7 @@ trt_opt_seq_len: 256           # Optimal sequence length for TRT
 **Stage 5: Deploy**
 ```yaml
 nim_image: nvcr.io/nim/nvidia/llama-nemotron-rerank-1b-v2:1.11.0
-model_dir: ./output/rerank/stage4_export  # Directory containing model_manifest.yaml
-nim_manifest_path: null        # Optional explicit NIM model manifest path
-nim_model_profile: null        # Optional profile from the manifest
+model_dir: ./output/rerank/stage4_export/onnx  # ONNX or TensorRT export directory
 bind_address: 127.0.0.1        # Host interface for the NIM ranking API
 host_port: 8000                # Host port for the NIM ranking API
 detach: false                  # Run in background
@@ -562,14 +560,14 @@ nemotron rerank export -c default quant_cfg=fp8
 ### Deploy
 
 ```bash
-# Deploy the Stage 4 NIM package in background (detached mode)
+# Deploy the Stage 4 ONNX export in background (detached mode)
 nemotron rerank deploy -c default detach=true
 
-# Deploy with a custom NIM manifest if packaging wrote it elsewhere
-nemotron rerank deploy -c default nim_manifest_path=/path/to/model_manifest.yaml
+# Deploy a TensorRT export instead
+nemotron rerank deploy -c default model_dir=./output/rerank/stage4_export/tensorrt
 
-# Or point at a directory that contains model_manifest.yaml
-nemotron rerank deploy -c default model_dir=/path/to/nim-model-dir
+# Serve the image default model instead of a fine-tuned export
+nemotron rerank deploy -c default model_dir=null
 
 # Replace a recipe-owned container with the same name
 nemotron rerank deploy -c default detach=true replace_existing=true
@@ -624,8 +622,7 @@ output/rerank/
 ├── stage3_eval/                   # Evaluation results
 │   └── eval_results.json
 └── stage4_export/                 # Exported models
-    ├── model_manifest.yaml         # NIM manifest, when packaging creates one
-    ├── onnx/                      # ONNX model files
+    ├── onnx/                      # ONNX model files mounted by deploy by default
     │   └── model.onnx
     └── tensorrt/                  # TensorRT engine (if enabled)
         └── model.plan

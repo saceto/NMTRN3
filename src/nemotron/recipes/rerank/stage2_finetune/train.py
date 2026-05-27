@@ -131,7 +131,10 @@ class FinetuneConfig(RecipeSettings):
         ge=2,
         description="Number of passages per query during training (1 pos + n-1 neg).",
     )
-    num_labels: int = Field(default=1, ge=1, description="Number of classification labels.")
+    num_labels: Literal[1] = Field(
+        default=1,
+        description="Rerank eval/export/deploy expects a single scalar relevance logit.",
+    )
     temperature: float = Field(default=1.0, gt=0, description="Temperature for cross-entropy loss.")
     pooling: Literal["avg", "cls", "last"] = Field(default="avg", description="Pooling strategy.")
 

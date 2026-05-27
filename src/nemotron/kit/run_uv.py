@@ -120,34 +120,26 @@ def main(stage_dir: Path) -> None:
     env["UV_PROJECT_ENVIRONMENT"] = str(venv_path)
     env["PATH"] = f"{venv_path / 'bin'}:{env.get('PATH', '')}"
 
-    # 7. Check if packages are already available (fast path)
-    print("[run_uv.py] Checking if packages are already available...")
-    check_result = subprocess.run(
-        [str(venv_python), "-c", "import nemo_automodel, omegaconf"],
-        capture_output=True,
-    )
+    # 7. Always sync the stage-local project. Container base images may already
+    # include major packages such as nemo-automodel, but stages can add smaller
+    # dependencies that must still be installed from their pyproject.toml.
+    print("[run_uv.py] Syncing packages using pyproject.toml (injecting exclude-dependencies)...")
+    temp_dir = _write_temp_pyproject(pyproject_data, stage_dir, exclude_deps)
+    print(f"[run_uv.py] Created temporary pyproject.toml at {temp_dir / 'pyproject.toml'}")
 
-    if check_result.returncode == 0:
-        print("[run_uv.py] Required packages already available, skipping installation")
-    else:
-        # 8. Write temp pyproject.toml with container exclude-dependencies
-        print("[run_uv.py] Syncing packages using pyproject.toml (injecting exclude-dependencies)...")
-        temp_dir = _write_temp_pyproject(pyproject_data, stage_dir, exclude_deps)
-        print(f"[run_uv.py] Created temporary pyproject.toml at {temp_dir / 'pyproject.toml'}")
+    # 8. Run uv sync
+    sync_cmd = [
+        uv_cmd, "sync",
+        "--active",
+        "--project", str(temp_dir),
+    ]
+    print(f"[run_uv.py] Running: {' '.join(sync_cmd)}")
+    result = subprocess.run(sync_cmd, env=env, cwd=str(temp_dir))
+    if result.returncode != 0:
+        print("[run_uv.py] ERROR: Package sync failed")
+        sys.exit(1)
 
-        # 9. Run uv sync
-        sync_cmd = [
-            uv_cmd, "sync",
-            "--active",
-            "--project", str(temp_dir),
-        ]
-        print(f"[run_uv.py] Running: {' '.join(sync_cmd)}")
-        result = subprocess.run(sync_cmd, env=env, cwd=str(temp_dir))
-        if result.returncode != 0:
-            print("[run_uv.py] ERROR: Package sync failed")
-            sys.exit(1)
-
-    # 10. Execute target script
+    # 9. Execute target script
     print("[run_uv.py] Dependencies installed successfully")
     cmd = [str(venv_python), str(target_script)] + sys.argv[1:]
     print(f"[run_uv.py] Executing: {' '.join(cmd)}")

@@ -1,13 +1,14 @@
 # Stage 5: Deploy Configuration
 #
-# Launches NVIDIA NeMo Retriever Reranking NIM. By default deploy looks for
-# the Stage 4 model_manifest.yaml and fails if it is missing, so it does not
-# silently serve the stock image model after a fine-tune/export pipeline.
+# Launches NVIDIA NeMo Retriever Reranking NIM. By default deploy mounts the
+# Stage 4 ONNX export directory and sets NIM_CUSTOM_MODEL. The NIM discovers
+# the mounted artifact and creates its runtime manifest during startup.
 #
 # Usage:
 #   nemotron rerank deploy -c default
 #   nemotron rerank deploy -c default detach=true
-#   nemotron rerank deploy -c default nim_manifest_path=/path/to/model_manifest.yaml
+#   nemotron rerank deploy -c default model_dir=/path/to/stage4_export/tensorrt
+#   nemotron rerank deploy -c default model_dir=null
 #
 # Test the deployed service:
 #   curl -X POST http://localhost:8000/v1/ranking \
@@ -25,12 +26,9 @@ container_name: nemotron-rerank-nim
 # the new one.
 replace_existing: false
 
-# Optional custom NIM model directory or manifest. The default points at Stage 4
-# output and must contain model_manifest.yaml unless nim_manifest_path is provided.
-model_dir: ${oc.env:NEMO_RUN_DIR,.}/output/rerank/stage4_export
-nim_manifest_path: null
-nim_model_profile: null
-nim_served_model_name: null
+# Optional custom ONNX/TensorRT export directory. Set null to serve the image
+# default model instead of a fine-tuned export.
+model_dir: ${oc.env:NEMO_RUN_DIR,.}/output/rerank/stage4_export/onnx
 
 # Container internal paths
 container_model_path: /opt/nim/custom_model

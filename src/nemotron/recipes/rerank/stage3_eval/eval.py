@@ -593,6 +593,10 @@ def run_eval(cfg: EvalConfig) -> dict:
     # Step 3: Evaluate fine-tuned reranker
     if cfg.eval_finetuned:
         if not cfg.finetuned_model_path.exists():
+            if cfg.eval_nim:
+                print(f"Error: Fine-tuned model not found at {cfg.finetuned_model_path}", file=sys.stderr)
+                print("       Cannot verify the NIM export against the fine-tuned checkpoint.", file=sys.stderr)
+                sys.exit(1)
             print(f"Warning: Fine-tuned model not found at {cfg.finetuned_model_path}")
             print("         Skipping fine-tuned model evaluation.")
         else:
@@ -681,6 +685,7 @@ def run_eval(cfg: EvalConfig) -> dict:
         metric_names = ["NDCG", "Recall"]
         metric_indices = [0, 2]
 
+        nim_mismatch = False
         for name, idx in zip(metric_names, metric_indices):
             print(f"  {name}:")
             for k in results["finetuned"][idx]:
@@ -690,10 +695,15 @@ def run_eval(cfg: EvalConfig) -> dict:
                 sign = "+" if diff > 0 else ""
                 at_k = int(k.split("@")[1]) if "@" in k else 1
                 threshold = 0.03 if at_k < 5 else 0.01
-                status = "ok" if abs(diff) < threshold else "MISMATCH"
+                matched = abs(diff) < threshold
+                status = "ok" if matched else "MISMATCH"
+                nim_mismatch = nim_mismatch or not matched
                 pct = (diff / ft_val * 100) if ft_val != 0 else float("inf")
                 print(f"    {k}: {ft_val:.5f} -> {nim_val:.5f} ({sign}{diff:.5f}, {sign}{pct:.1f}%) {status}")
         print()
+        if nim_mismatch:
+            print("Error: NIM metrics differ from the fine-tuned checkpoint beyond tolerance.", file=sys.stderr)
+            sys.exit(1)
 
     # Save results
     results_file = cfg.output_dir / "eval_results.json"

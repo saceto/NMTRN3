@@ -425,9 +425,9 @@ def run_export(cfg: ExportConfig) -> dict:
     print()
 
     # Step 4: Export to TensorRT (optional)
-    if cfg.export_to_trt and not onnx_ok:
-        print("Skipping TensorRT conversion: ONNX verification failed.", file=sys.stderr)
-        print("Fix the ONNX export before converting to TensorRT.", file=sys.stderr)
+    if not onnx_ok:
+        print("Error: ONNX verification failed; refusing to publish an invalid export.", file=sys.stderr)
+        print("Fix the ONNX export before deploying or converting to TensorRT.", file=sys.stderr)
         sys.exit(1)
     if cfg.export_to_trt:
         print("Exporting to TensorRT...")
