@@ -2,6 +2,12 @@
 
 Evaluation of the `retriever-finetune-recipe` skill, which guides agents through Nemotron embedding and reranking fine-tuning recipe work.
 
+## Conformance Status
+
+This report follows the functional skill evaluation approach: define realistic task cases, run the agent harness with and without the skill, compare aggregate metrics, and publish only reusable fixtures plus the summary report. Generated run artifacts stay out of source control.
+
+Current publication status: Codex evaluation is recorded; Claude Code evaluation is still pending and should be completed, or an explicit exception documented, before final publication.
+
 ## Agents Used
 
 | Agent harness | Model | Status |
@@ -24,7 +30,7 @@ Static validation also uses deterministic skill-quality checks.
 
 ## Test Tasks
 
-The dataset contains 4 task-shaped cases in `evals/evals.json`:
+The dataset contains 4 realistic task cases in `evals/evals.json`:
 
 | Task | Type |
 | --- | --- |
@@ -43,6 +49,6 @@ The dataset contains 4 task-shaped cases in `evals/evals.json`:
 
 ## Notes
 
-The eval setup compares with-skill and without-skill performance, keeps generated `evals/results/` output out of source control, and uses task prompts that do not explicitly name the skill.
+The eval setup compares with-skill and without-skill performance, keeps generated `evals/results/` output out of source control, and uses task prompts that do not explicitly name the skill. The committed `evals/evals.json` file is the reusable test dataset; aggregate results are summarized here rather than committing full run directories or raw provider traces.
 
 The Claude Code run is not recorded here yet because live evaluation sends workspace skill/eval content to configured model providers and requires explicit approval in this environment.

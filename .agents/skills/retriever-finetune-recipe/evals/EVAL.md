@@ -1,6 +1,6 @@
 # Evaluation Guidance
 
-This skill follows a task-based skill evaluation approach: define realistic tasks, run the chosen agent harness with and without the skill, compare outcomes, and report uplift.
+This skill follows a functional skill evaluation approach: define realistic tasks, run the chosen agent harness with and without the skill, compare outcomes, and report uplift.
 
 ## Evaluation Goals
 
@@ -8,7 +8,7 @@ The evaluation is functional: it checks whether agents use the skill when retrie
 
 ## Dataset Rules
 
-- Keep prompts task-shaped. Do not name the skill in user prompts.
+- Keep prompts realistic. Do not name the skill in user prompts.
 - Include positive cases for embedding planning, reranker selection, and deployment debugging.
 - Include at least one negative case where the skill should not activate.
 - Keep `expected_skill`, `ground_truth`, and ordered `expected_behavior` entries explicit enough for deterministic and judge-based grading.
