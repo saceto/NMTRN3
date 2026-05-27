@@ -231,10 +231,10 @@ nemotron rerank finetune -c default
 # Stage 3: Evaluate base vs fine-tuned reranker
 nemotron rerank eval -c default
 
-# Stage 4: Export to ONNX/TensorRT for deployment
+# Stage 4: Export to ONNX/TensorRT for conversion checks or NIM packaging
 nemotron rerank export -c default
 
-# Stage 5: Deploy NIM with custom model
+# Stage 5: Deploy NeMo Retriever Reranking NIM
 nemotron rerank deploy -c default
 
 # Optional: Verify NIM accuracy matches checkpoint
@@ -259,7 +259,7 @@ Stages are designed to run sequentially, but you can start from any stage if you
 | **Stage 2** | Training data (Automodel format) | Skip data prep if data is ready |
 | **Stage 3** | Model checkpoint | Evaluate existing checkpoint |
 | **Stage 4** | Model checkpoint | Export existing model |
-| **Stage 5** | Exported model (ONNX/TensorRT) | Deploy existing model |
+| **Stage 5** | Reranking NIM image; optional NIM model manifest | Deploy the ranking API |
 
 See individual stage configs for input format requirements.
 
@@ -385,19 +385,16 @@ nemotron rerank finetune -c default --batch my-cluster run.env.partition=batch
 nemotron rerank finetune -c default --batch my-cluster run.env.time=08:00:00
 ```
 
-### Interactive Debugging
+### Remote Job Inspection
 
-Stage files to the cluster for interactive debugging:
+Use dry runs to inspect commands and generated job configuration before submitting cluster work:
 
 ```bash
-# Stage files without executing
-nemotron rerank finetune -c default --run my-cluster --stage
-
-# Then SSH to cluster and run manually
-ssh cluster.example.com
-cd /path/to/staged/files
-./run.sh
+nemotron rerank finetune -c default --run my-cluster --dry-run
+nemotron rerank eval -c default --batch my-cluster --dry-run
 ```
+
+Rerank stage commands currently launch jobs directly in remote modes; `--stage` is rejected for these commands until staged-file execution is implemented.
 
 ## Configuration
 
@@ -475,9 +472,12 @@ trt_opt_seq_len: 256           # Optimal sequence length for TRT
 
 **Stage 5: Deploy**
 ```yaml
-nim_image: nvcr.io/nim/nvidia/llama-nemotron-rerank-1b-v2:1.10.0
-model_dir: ./output/rerank/stage4_export/onnx  # Path to exported model
-host_port: 8000                # Port for NIM ranking API
+nim_image: nvcr.io/nim/nvidia/llama-nemotron-rerank-1b-v2:1.11.0
+model_dir: null                # Optional directory containing model_manifest.yaml
+nim_manifest_path: null        # Optional explicit NIM model manifest path
+nim_model_profile: null        # Optional profile from the manifest
+bind_address: 127.0.0.1        # Host interface for the NIM ranking API
+host_port: 8000                # Host port for the NIM ranking API
 detach: false                  # Run in background
 ```
 
@@ -548,14 +548,17 @@ nemotron rerank export -c default quant_cfg=fp8
 ### Deploy
 
 ```bash
-# Deploy NIM with custom ONNX model (foreground)
+# Deploy the default Reranking NIM (foreground)
 nemotron rerank deploy -c default
 
 # Deploy in background (detached mode)
 nemotron rerank deploy -c default detach=true
 
-# Deploy with custom model directory
-nemotron rerank deploy -c default model_dir=./output/rerank/stage4_export/onnx
+# Deploy with a custom NIM manifest
+nemotron rerank deploy -c default nim_manifest_path=/path/to/model_manifest.yaml
+
+# Or point at a directory that contains model_manifest.yaml
+nemotron rerank deploy -c default model_dir=/path/to/nim-model-dir
 
 # Stop the NIM container
 docker stop nemotron-rerank-nim

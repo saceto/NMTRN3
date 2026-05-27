@@ -17,7 +17,7 @@ corpus_id: nv_pp_random
 corpus_dir: hf://nvidia/Retrieval-Synthetic-NVDocs-v1@1c0d1856f3fb595b2dda98d4b61061fa6d782d51/sample_corpus/nv_pp_random
 
 # Output directory for generated synthetic data
-output_dir: ./output/rerank/stage0_sdg
+output_dir: ${oc.env:NEMO_RUN_DIR,.}/output/rerank/stage0_sdg
 
 # Document processing
 min_text_length: 50
@@ -53,6 +53,6 @@ embed_model: nvidia/llama-3.2-nv-embedqa-1b-v2
 embed_provider: nvidia
 
 # Runtime options
-artifact_path: ./output/rerank/stage0_sdg/artifacts
+artifact_path: ${oc.env:NEMO_RUN_DIR,.}/output/rerank/stage0_sdg/artifacts
 preview: false
 log_level: INFO

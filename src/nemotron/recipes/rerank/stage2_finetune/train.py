@@ -35,7 +35,7 @@
 """Fine-tuning script for cross-encoder reranking models.
 
 Fine-tunes a reranking model using cross-entropy classification loss
-with prepared training data (from embed stage1_data_prep).
+with prepared training data from rerank Stage 1 prep.
 
 Usage:
     # With default config
@@ -66,6 +66,11 @@ DEFAULT_CONFIG_PATH = STAGE_PATH / "config" / "default.yaml"
 
 # Use NEMO_RUN_DIR for output when running via nemo-run
 _OUTPUT_BASE = Path(os.environ.get("NEMO_RUN_DIR", "."))
+
+
+def _is_rank_zero() -> bool:
+    """Return True for the single process that should publish shared artifacts."""
+    return os.environ.get("RANK", "0") == "0"
 
 
 class FinetuneConfig(RecipeSettings):
@@ -146,6 +151,27 @@ def _count_training_examples(train_data_path: Path) -> int:
     with open(train_data_path) as f:
         data = json.load(f)
     return len(data.get("data", []))
+
+
+def _warn_if_negatives_sparse(train_data_path: Path, train_n_passages: int) -> None:
+    """Warn if training data has fewer negatives than train_n_passages requires."""
+    needed = train_n_passages - 1
+    with open(train_data_path) as f:
+        data = json.load(f)
+    records = data.get("data", [])
+    if not records:
+        return
+    neg_counts = [len(r.get("neg_doc", [])) for r in records[:200]]
+    median_neg = sorted(neg_counts)[len(neg_counts) // 2]
+    if median_neg < needed:
+        print(
+            f"Warning: train_n_passages={train_n_passages} needs {needed} negatives per query,\n"
+            f"         but training data has a median of {median_neg}.\n"
+            f"         Consider increasing hard_negatives_to_mine in stage1 prep or\n"
+            f"         reducing train_n_passages.",
+            file=sys.stderr,
+        )
+        print()
 
 
 def _auto_scale_hyperparams(
@@ -320,11 +346,12 @@ def run_finetune(cfg: FinetuneConfig) -> Path:
     # Validate inputs
     if not cfg.train_data_path.exists():
         print(f"Error: Training data not found: {cfg.train_data_path}", file=sys.stderr)
-        print("       Please run 'nemotron embed prep' first.", file=sys.stderr)
+        print("       Please run 'nemotron rerank prep' first.", file=sys.stderr)
         sys.exit(1)
 
-    # Count training examples
+    # Count training examples and check negative passage availability
     num_examples = _count_training_examples(cfg.train_data_path)
+    _warn_if_negatives_sparse(cfg.train_data_path, cfg.train_n_passages)
 
     global_batch_size, num_epochs, ckpt_every, val_every = _auto_scale_hyperparams(
         cfg, num_examples
@@ -403,6 +430,7 @@ def run_finetune(cfg: FinetuneConfig) -> Path:
         except ImportError:
             attn_impl = "sdpa"
         print(f"  Attention:    {attn_impl} (auto-detected)")
+    automodel_cfg.model.attn_implementation = attn_impl
 
     # Data settings
     automodel_cfg.dataloader.dataset.data_dir_list = [str(cfg.train_data_path)]
@@ -423,6 +451,7 @@ def run_finetune(cfg: FinetuneConfig) -> Path:
     # Warmup must be strictly less than total decay steps
     lr_warmup_steps = min(cfg.lr_warmup_steps, max(1, total_steps - 1))
     automodel_cfg.lr_scheduler.lr_warmup_steps = lr_warmup_steps
+    automodel_cfg.lr_scheduler.lr_decay_style = cfg.lr_decay_style
 
     # Checkpoint settings
     automodel_cfg.checkpoint.checkpoint_dir = str(cfg.checkpoint_dir)
@@ -440,21 +469,22 @@ def run_finetune(cfg: FinetuneConfig) -> Path:
     print(f"   Model:      {final_model_dir}")
 
     # Save artifact (registers with artifact registry if kit.init() was called)
-    try:
-        from nemotron.kit.artifacts.rerank import RerankModelArtifact
+    if _is_rank_zero():
+        try:
+            from nemotron.kit.artifacts.rerank import RerankModelArtifact
 
-        artifact = RerankModelArtifact(
-            path=final_model_dir,
-            base_model=cfg.base_model,
-            training_examples=num_examples,
-            num_epochs=num_epochs,
-            global_batch_size=global_batch_size,
-            learning_rate=cfg.learning_rate,
-            num_labels=cfg.num_labels,
-        )
-        artifact.save(name="rerank/model")
-    except Exception:
-        pass  # Artifact save is best-effort — don't break the pipeline
+            artifact = RerankModelArtifact(
+                path=final_model_dir,
+                base_model=cfg.base_model,
+                training_examples=num_examples,
+                num_epochs=num_epochs,
+                global_batch_size=global_batch_size,
+                learning_rate=cfg.learning_rate,
+                num_labels=cfg.num_labels,
+            )
+            artifact.save(name="rerank/model")
+        except Exception:
+            pass  # Artifact save is best-effort — don't break the pipeline
 
     return final_model_dir
 

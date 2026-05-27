@@ -21,7 +21,7 @@ reranking model fine-tuning workflow:
 - finetune: Fine-tune the cross-encoder reranking model
 - eval: Evaluate models on reranking metrics
 - export: Export model to ONNX/TensorRT for optimized inference
-- deploy: Deploy NIM container with custom model
+- deploy: Deploy NeMo Retriever Reranking NIM
 """
 
 from __future__ import annotations
@@ -60,7 +60,7 @@ def info() -> None:
     console.print("  3. [cyan]finetune[/] - Fine-tune the cross-encoder reranking model")
     console.print("  4. [cyan]eval[/]     - Evaluate base vs fine-tuned rerankers")
     console.print("  5. [cyan]export[/]   - Export model to ONNX/TensorRT")
-    console.print("  6. [cyan]deploy[/]   - Deploy NIM with custom model")
+    console.print("  6. [cyan]deploy[/]   - Deploy NeMo Retriever Reranking NIM")
     console.print()
     console.print("[bold]Key Components:[/bold]")
     console.print("  - retriever-sdg (synthetic data generation)")

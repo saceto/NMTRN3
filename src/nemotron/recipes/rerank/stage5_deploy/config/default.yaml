@@ -1,12 +1,13 @@
 # Stage 5: Deploy Configuration
 #
-# Launches NIM reranking service with a custom fine-tuned model.
-# The NIM provides a ranking API for re-ranking query-document pairs.
+# Launches NVIDIA NeMo Retriever Reranking NIM. Custom fine-tuned models
+# require a NIM model_manifest.yaml; raw ONNX/TensorRT directories from
+# Stage 4 are not passed to NIM directly.
 #
 # Usage:
 #   nemotron rerank deploy -c default
 #   nemotron rerank deploy -c default detach=true
-#   nemotron rerank deploy -c default model_dir=/path/to/onnx
+#   nemotron rerank deploy -c default nim_manifest_path=/path/to/model_manifest.yaml
 #
 # Test the deployed service:
 #   curl -X POST http://localhost:8000/v1/ranking \
@@ -14,22 +15,27 @@
 #     -d '{"model": "nvidia/llama-nemotron-rerank-1b-v2", "query": {"text": "what is AI?"}, "passages": [{"text": "AI is artificial intelligence"}]}'
 
 # NIM container image
-nim_image: nvcr.io/nim/nvidia/llama-nemotron-rerank-1b-v2:1.10.0
+nim_image: nvcr.io/nim/nvidia/llama-nemotron-rerank-1b-v2:1.11.0
 
 # Container name (for management)
 container_name: nemotron-rerank-nim
 
-# Path to custom model (ONNX or TensorRT from stage4_export)
-model_dir: ./output/rerank/stage4_export/onnx
+# Replace an existing recipe-owned container with the same name
+replace_existing: true
 
-# Use ONNX instead of TensorRT
-use_onnx: true
+# Optional custom NIM model directory or manifest. If model_dir is set, it must
+# contain model_manifest.yaml unless nim_manifest_path is provided.
+model_dir: null
+nim_manifest_path: null
+nim_model_profile: null
+nim_served_model_name: null
 
 # Container internal paths
 container_model_path: /opt/nim/custom_model
 container_cache_path: /opt/nim/.cache
 
 # Network settings
+bind_address: 127.0.0.1
 host_port: 8000
 container_port: 8000
 
@@ -37,7 +43,7 @@ container_port: 8000
 gpus: all
 
 # Shared memory size
-shm_size: 2gb
+shm_size: 16gb
 
 # Runtime settings
 detach: false

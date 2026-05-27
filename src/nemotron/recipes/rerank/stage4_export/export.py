@@ -189,6 +189,11 @@ def export_to_onnx(
         tokenizer=tokenizer,
     )
 
+    # Apply quantization if configured
+    if cfg.quant_cfg is not None:
+        print(f"  Applying quantization: {cfg.quant_cfg}")
+        _apply_quantization(onnx_exporter, cfg)
+
     # Disable dynamo export
     import torch
     import torch.onnx
@@ -243,6 +248,27 @@ def export_to_onnx(
                 setattr(sys.modules[mod_name], 'create_bidirectional_mask', orig_fn)
 
     return onnx_exporter
+
+
+def _apply_quantization(onnx_exporter: Any, cfg: ExportConfig) -> None:
+    """Apply quantization to the model before ONNX export."""
+    from functools import partial
+
+    import torch
+    from nemo.collections.llm.modelopt.quantization.quantizer import get_calib_data_iter
+    from tqdm import tqdm
+
+    def forward_loop(model: Any, data: Any, tokenizer: Any) -> None:
+        for inputs in tqdm(data, desc="Calibration"):
+            batch = tokenizer(inputs, padding=True, truncation=True, return_tensors="pt")
+            batch = {k: v.to(model.device) for k, v in batch.items()}
+            with torch.no_grad():
+                model(**batch)
+
+    data = get_calib_data_iter(batch_size=cfg.calibration_batch_size)
+    forward_loop_fn = partial(forward_loop, data=data, tokenizer=onnx_exporter.tokenizer)
+
+    onnx_exporter.quantize(quant_cfg=cfg.quant_cfg, forward_loop=forward_loop_fn)
 
 
 def export_onnx_to_tensorrt(onnx_exporter: Any, cfg: ExportConfig) -> None:

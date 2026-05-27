@@ -153,7 +153,11 @@ def _run_pipeline_remote(
             run_fn = getattr(mod, STAGE_RUN_FNS[stage_name])
             run_fn(options, experiment=exp)
 
-        exp.run(detach=not base_options.attached, tail_logs=base_options.attached)
+        exp.run(
+            sequential=True,
+            detach=not base_options.attached,
+            tail_logs=base_options.attached,
+        )
 
 
 def run(

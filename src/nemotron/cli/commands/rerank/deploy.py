@@ -14,7 +14,7 @@
 
 """Deploy command implementation.
 
-Launches NIM container with custom fine-tuned reranking model for inference.
+Launches NeMo Retriever Reranking NIM for inference.
 Deploy is local-only (it's just a Docker wrapper).
 """
 
@@ -47,12 +47,16 @@ META = RecipeMeta(
     config_dir=str(SPEC.config_dir),
     config_model=DeployConfig,
     default_config=SPEC.config.default,
-    input_artifacts={"model": "Exported model directory (ONNX/TensorRT)"},
+    input_artifacts={"manifest": "Optional NIM model manifest"},
 )
 
 
 def _execute_deploy(cfg: RecipeConfig):
     """Execute deploy locally."""
+    if cfg.mode != "local":
+        typer.echo("Error: rerank deploy is local-only; --run/--batch are not supported.", err=True)
+        raise typer.Exit(1)
+
     train_config = parse_config(cfg.ctx, SPEC.config_dir, SPEC.config.default)
 
     job_config = build_job_config(
@@ -85,6 +89,6 @@ def _execute_deploy(cfg: RecipeConfig):
 
 
 def deploy(ctx: typer.Context) -> None:
-    """Deploy NIM container with custom fine-tuned reranking model for inference."""
+    """Deploy NeMo Retriever Reranking NIM for inference."""
     cfg = parse_recipe_config(ctx)
     _execute_deploy(cfg)

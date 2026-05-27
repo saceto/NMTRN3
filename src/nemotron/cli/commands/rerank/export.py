@@ -69,13 +69,18 @@ def _execute_export(cfg: RecipeConfig, *, experiment=None):
         env_profile=env,
     )
 
-    display_job_config(job_config, for_remote=False)
+    for_remote = cfg.mode != "local"
+    display_job_config(job_config, for_remote=for_remote)
 
     if cfg.dry_run:
         return
 
+    if cfg.stage:
+        typer.echo("Error: --stage is not supported for rerank stage commands yet.", err=True)
+        raise typer.Exit(1)
+
     job_dir = generate_job_dir(SPEC.name)
-    train_config_for_script = extract_train_config(job_config, for_remote=False)
+    train_config_for_script = extract_train_config(job_config, for_remote=for_remote)
     job_path, train_path = save_configs(job_config, train_config_for_script, job_dir)
 
     env_for_executor = job_config.run.env if hasattr(job_config.run, "env") else None
@@ -149,6 +154,7 @@ def _execute_remote(
         attached=attached,
         force_squash=force_squash,
         default_image=SPEC.image,
+        script_resources=SPEC.resources,
     )
 
     recipe_name = SPEC.name.replace("/", "-")

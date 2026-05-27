@@ -19,11 +19,11 @@ run:
 # Base reranking model to fine-tune
 base_model: nvidia/llama-nemotron-rerank-1b-v2
 
-# Path to training data (output from embed stage1_data_prep)
-train_data_path: ./output/rerank/stage1_prep/train_mined.automodel_unrolled.json
+# Path to training data (output from rerank Stage 1 prep)
+train_data_path: ${oc.env:NEMO_RUN_DIR,.}/output/rerank/stage1_prep/train_mined.automodel_unrolled.json
 
 # Directory for saving checkpoints
-checkpoint_dir: ./output/rerank/stage2_finetune/checkpoints
+checkpoint_dir: ${oc.env:NEMO_RUN_DIR,.}/output/rerank/stage2_finetune/checkpoints
 
 # Training hyperparameters
 num_epochs: 3

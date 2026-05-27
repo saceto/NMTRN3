@@ -12,4 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Stage 2: Export reranking model to ONNX/TensorRT."""
+"""Stage 4: Export reranking model to ONNX/TensorRT."""

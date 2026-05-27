@@ -59,7 +59,6 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Literal
 
 # Must be set before transformers is imported (BEIR imports it at module level)
 os.environ.setdefault("HF_HUB_TRUST_REMOTE_CODE", "1")
@@ -103,7 +102,6 @@ class EvalConfig(RecipeSettings):
     corpus_chunk_size: int = Field(default=50000, gt=0, description="Chunk size for corpus encoding.")
 
     # Retrieval model settings
-    retrieval_pooling: Literal["avg", "cls", "last"] = Field(default="avg", description="Pooling strategy for retrieval model.")
     retrieval_normalize: bool = Field(default=True, description="Whether to L2 normalize retrieval embeddings.")
     query_prefix: str = Field(default="query:", description="Prefix for query inputs (retrieval model).")
     passage_prefix: str = Field(default="passage:", description="Prefix for passage inputs (retrieval model).")
@@ -137,6 +135,7 @@ class _SentenceTransformerRetriever:
         model_path: str,
         query_prefix: str = "query:",
         passage_prefix: str = "passage:",
+        normalize_embeddings: bool = True,
     ):
         import torch
         from sentence_transformers import SentenceTransformer
@@ -148,9 +147,11 @@ class _SentenceTransformerRetriever:
         )
         self.query_prefix = query_prefix
         self.passage_prefix = passage_prefix
+        self.normalize_embeddings = normalize_embeddings
 
     def encode_queries(self, queries: list[str], batch_size: int = 128, **kwargs):
         prompts = [f"{self.query_prefix} {q}" for q in queries]
+        kwargs.setdefault("normalize_embeddings", self.normalize_embeddings)
         return self.model.encode(prompts, batch_size=batch_size, **kwargs)
 
     def encode_corpus(self, corpus: list[dict[str, str]], batch_size: int = 128, **kwargs):
@@ -159,6 +160,7 @@ class _SentenceTransformerRetriever:
             title = doc.get("title", "")
             text = doc.get("text", "")
             texts.append(f"{self.passage_prefix} {title} {text}".strip())
+        kwargs.setdefault("normalize_embeddings", self.normalize_embeddings)
         return self.model.encode(texts, batch_size=batch_size, **kwargs)
 
 
@@ -170,6 +172,7 @@ def _get_first_stage_results(
     k_values: list[int] | None = None,
     query_prefix: str = "query:",
     passage_prefix: str = "passage:",
+    normalize_embeddings: bool = True,
 ) -> tuple[dict, dict, dict, dict]:
     """Run first-stage dense retrieval to get candidates for re-ranking.
 
@@ -193,6 +196,7 @@ def _get_first_stage_results(
         model_path=str(retrieval_model),
         query_prefix=query_prefix,
         passage_prefix=passage_prefix,
+        normalize_embeddings=normalize_embeddings,
     )
 
     dres_model = DRES(
@@ -474,7 +478,7 @@ def run_eval(cfg: EvalConfig) -> dict:
     # Validate inputs
     if not cfg.eval_data_path.exists():
         print(f"Error: Eval data path not found: {cfg.eval_data_path}", file=sys.stderr)
-        print("       Please run 'nemotron embed prep' first or provide eval data.", file=sys.stderr)
+        print("       Please run 'nemotron rerank prep' first or provide eval data.", file=sys.stderr)
         sys.exit(1)
 
     # Create output directory
@@ -484,14 +488,16 @@ def run_eval(cfg: EvalConfig) -> dict:
 
     # Step 1: Run first-stage dense retrieval
     print(f"Running first-stage retrieval with: {cfg.retrieval_model}")
+    retrieval_k_values = sorted({*cfg.k_values, cfg.top_k})
     corpus, queries, qrels, first_stage_results = _get_first_stage_results(
         retrieval_model=cfg.retrieval_model,
         dataset_path=cfg.eval_data_path,
         batch_size=cfg.retrieval_batch_size,
         corpus_chunk_size=cfg.corpus_chunk_size,
-        k_values=cfg.k_values,
+        k_values=retrieval_k_values,
         query_prefix=cfg.query_prefix,
         passage_prefix=cfg.passage_prefix,
+        normalize_embeddings=cfg.retrieval_normalize,
     )
     print(f"   Retrieved candidates for {len(queries)} queries")
     print()

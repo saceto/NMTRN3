@@ -21,10 +21,10 @@ run:
 corpus_id: nv_pp_random
 
 # Path to SDG output directory (from rerank sdg stage)
-sdg_input_path: ./output/rerank/stage0_sdg
+sdg_input_path: ${oc.env:NEMO_RUN_DIR,.}/output/rerank/stage0_sdg
 
 # Output directory for prepared training data
-output_dir: ./output/rerank/stage1_prep
+output_dir: ${oc.env:NEMO_RUN_DIR,.}/output/rerank/stage1_prep
 
 # Base embedding model for hard negative mining
 base_model: nvidia/llama-nemotron-embed-1b-v2
