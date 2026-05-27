@@ -1,0 +1,40 @@
+---
+title: "Parameter-Efficient Fine-Tuning Steps"
+slug: "train-models/reference/peft/index.html"
+description: "This section documents the parameter-efficient fine-tuning (PEFT) steps registered under src/nemotron/steps/peft/. Each step trains a low-rank adaptation (LoRA) adapter on top of a base model and prod"
+---
+
+This section documents the parameter-efficient fine-tuning (PEFT) steps registered under `src/nemotron/steps/peft/`.
+Each step trains a low-rank adaptation (LoRA) adapter on top of a base model and produces a `checkpoint_lora` artifact.
+Merge that artifact with the base model by using the `convert/merge_lora` step when you need a standalone Hugging Face (HF) checkpoint for deployment.
+
+## Steps
+
+<CardGroup cols={2}>
+<Card href="/automodel" title="peft/automodel">
+LoRA tuning with the NeMo AutoModel library against Hugging Face base models and JSON Lines chat datasets.
+
+---
+
+<Badge intent="success">reference</Badge>
+
+</Card>
+
+<Card href="/megatron-bridge" title="peft/megatron_bridge">
+LoRA tuning on top of NVIDIA Megatron-Bridge for distributed training of the Nemotron model family.
+
+---
+
+<Badge intent="success">reference</Badge>
+
+</Card>
+
+</CardGroup>
+
+## Related Documentation
+
+- [Nemotron Steps CLI Reference](/../cli-reference) covers the shared option set, dotlist overrides, and passthrough arguments.
+
+- [Choose a PEFT Backend](/../../how-to/choose-peft-backend) compares `peft/automodel` and `peft/megatron_bridge`.
+
+- [Configuration Conventions](/../config-conventions) describes the per-step `config/` layout.

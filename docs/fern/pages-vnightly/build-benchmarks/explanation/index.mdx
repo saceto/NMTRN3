@@ -1,0 +1,99 @@
+---
+title: "Concepts"
+slug: "build-benchmarks/explanation/index.html"
+description: "These pages explain how the mcq family inside src/nemotron/steps/byob prepares data, runs each generation stage, and optionally translates benchmarks."
+---
+
+{/* SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  SPDX-License-Identifier: Apache-2.0 */}
+
+These pages explain how the `mcq` family inside `src/nemotron/steps/byob` prepares data, runs each generation stage, and optionally translates benchmarks.
+
+## Architecture
+
+<CardGroup cols={2}>
+<Card href="/pipeline-overview" icon="fa-regular fa-workflow" title="Pipeline overview">
+Prepare, generate, translate, and the Parquet stage cache.
+
+---
+
+<Badge intent="info">stages</Badge>
+
+</Card>
+
+</CardGroup>
+
+## Core processes
+
+<CardGroup cols={2}>
+<Card href="/data-preparation" icon="fa-regular fa-database" title="Data preparation">
+Seeds from Hugging Face plus local corpus chunks.
+
+---
+
+<Badge intent="info">few-shot</Badge>
+
+</Card>
+
+<Card href="/get-right-questions" icon="fa-regular fa-cross-reference" title="Mapping targets to sources">
+`source_subjects`, weights, and optional tags.
+
+---
+
+<Badge intent="info">target_source_mapping</Badge>
+
+</Card>
+
+<Card href="/question-generation" icon="fa-regular fa-sparkle-fill" title="Question generation">
+Data Designer batched calls from prepared seeds.
+
+---
+
+<Badge intent="info">generation</Badge>
+
+</Card>
+
+</CardGroup>
+
+## Quality assurance
+
+<CardGroup cols={2}>
+<Card href="/quality-validation" icon="fa-regular fa-checklist" title="Validation stack">
+Judgement, deduplication, distractors, coverage, outliers.
+
+---
+
+<Badge intent="info">validation</Badge>
+
+</Card>
+
+<Card href="/filtering" icon="fa-regular fa-filter" title="Filtering">
+Easiness and hallucination scores with removal flags.
+
+---
+
+<Badge intent="info">filtering</Badge>
+
+</Card>
+
+</CardGroup>
+
+## Translation
+
+<CardGroup cols={2}>
+<Card href="/translation" icon="fa-regular fa-globe" title="Translation">
+Curator translation, backtranslation, metrics, final schema.
+
+---
+
+<Badge intent="info">translate</Badge>
+
+</Card>
+
+</CardGroup>
+
+## Next steps
+
+- Hands-on first run: [Getting Started with Building MCQ Benchmarks](/../getting-started)
+
+- YAML tables: [Reference](/../reference/index)

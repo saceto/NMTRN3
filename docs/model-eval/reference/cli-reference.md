@@ -41,7 +41,7 @@ Invoking the command without `-c` resolves the runspec default, `default.yaml`.
 | `target.api_endpoint.url=<url>` | OpenAI-compatible endpoint URL for hosted evaluation when `deployment.type=none`. |
 | `target.api_endpoint.model_id=<id>` | Exact model id advertised by the hosted endpoint. |
 | `target.api_endpoint.api_key_name=<env-var-name>` | Name of the environment variable holding the bearer token. This is the variable name, not the secret. |
-| `target.api_endpoint.type=<chat|completions>` | Endpoint type expected by the selected task. |
+| `target.api_endpoint.type=<chat\|completions>` | Endpoint type expected by the selected task. |
 | `evaluation.nemo_evaluator_config.config.params.limit_samples=<int>` | Per-task sample cap for smoke tests. |
 | `evaluation.nemo_evaluator_config.config.params.parallelism=<int>` | Concurrent requests issued by the evaluator where supported. |
 | `evaluation.nemo_evaluator_config.config.params.request_timeout=<int>` | Per-request timeout in seconds. |

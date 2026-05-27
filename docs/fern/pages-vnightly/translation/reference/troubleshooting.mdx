@@ -1,0 +1,58 @@
+---
+title: "Troubleshooting"
+slug: "translation/reference/troubleshooting.html"
+description: "This page lists common symptoms when you run nemotron steps run translate/nemo_curator and shows the field, flag, or environment variable to inspect first. Each table pairs a symptom with a concrete r"
+---
+
+{/* Reference: symptom-to-remedy tables for nemotron steps run translate/nemo_curator runs across all four backends and FAITH evaluation. */}
+
+This page lists common symptoms when you run `nemotron steps run translate/nemo_curator` and shows the field, flag, or environment variable to inspect first.
+Each table pairs a symptom with a concrete remedy.
+For stage flow and design rationale, see the explanation pages linked from [Concepts](/../explanation/index).
+
+## Authentication and Credentials
+
+| Symptom | What to do |
+| --- | --- |
+| HTTP 401 or 403 from the chat-completions endpoint, or a Curator log line about a missing API key | Confirm the variable named in <code>server.api_key_env</code> is exported in the shell that launches the run. The starter <code>default.yaml</code> expects <code>NVIDIA_API_KEY</code>; export it with <code>export NVIDIA_API_KEY="&lt;api-key&gt;"</code> and rerun. See [Run LLM Translation](/../how-to/run-llm-translation). |
+| FAITH scoring fails with a credentials error even though <code>backend</code> is <code>nmt</code>, <code>google</code>, or <code>aws</code> | FAITH always uses the large language model (LLM) client under <code>server</code>. Keep <code>server.api_key_env</code> populated whenever <code>faith_eval.enabled</code> is <code>true</code>, or set <code>faith_eval.enabled=false</code> for a diagnostic run. See [Run FAITH Evaluation](/../how-to/run-faith-evaluation). |
+| Google backend rejects the request with a permission or project error | Confirm application default credentials are present in the environment that runs the step. Do not paste secrets into <code>default.yaml</code>. See [Run Google or AWS Translation](/../how-to/run-google-aws-translation). |
+
+## Model and Endpoint Configuration
+
+| Symptom | What to do |
+| --- | --- |
+| HTTP 404 or a “model not found” message from the LLM endpoint | Hosted catalogs retire identifiers frequently. List the models your tenant currently exposes and pin <code>server.model</code> to one of them before large batch jobs. See [Run LLM Translation](/../how-to/run-llm-translation). |
+| Google translation rejects the request because <code>project_id</code> is missing | API version <code>v3</code> requires project metadata. Set both <code>google.project_id</code> and <code>google.api_version=v3</code>, or downgrade <code>google.api_version</code> to a release that does not require the project. See [Run Google or AWS Translation](/../how-to/run-google-aws-translation). |
+| NMT requests time out before the service responds | Raise <code>nmt.timeout</code> to match observed server latency, lower <code>nmt.batch_size</code> so each request returns sooner, and confirm <code>nmt.server_url</code> resolves from the host that runs the step. See [Run NMT Translation](/../how-to/run-nmt-translation). |
+
+## Throttling and Concurrency
+
+| Symptom | What to do |
+| --- | --- |
+| HTTP 429 responses, bursty failures, or sustained slowdowns from a hosted LLM endpoint | Lower <code>max_concurrent_requests</code> in your YAML and rerun on a smaller slice of data. Confirm your tenant quota covers the planned batch size. See [Translation YAML Reference](/translate-config). |
+| A self-hosted NMT service returns errors under load | Reduce <code>nmt.max_concurrent_requests</code> and <code>nmt.batch_size</code> together, then raise them only after the service reports healthy throughput. See [Run NMT Translation](/../how-to/run-nmt-translation). |
+
+## Inputs and Output Layout
+
+| Symptom | What to do |
+| --- | --- |
+| Reader errors about mixed file types when <code>input_path</code> points at a directory containing both JSONL and Parquet files | Curator readers expect one record format per directory. Split the inputs into separate directories for JSON Lines (JSONL) and Parquet, or set <code>input_path</code> to a single file. See [Input and Output Format](/io-format). |
+| Ray worker logs show <code>Creating virtual environment at: .venv</code> followed by <code>ModuleNotFoundError: No module named 'ray'</code> | Export <code>RAY_ENABLE_UV_RUN_RUNTIME_ENV=0</code> before running local <code>uv run --no-sync nemotron steps run translate/nemo_curator ...</code>. This keeps Ray workers in the synchronized Nemotron environment. |
+| Empty JSONL input fails with <code>No data read from files in task file_group_0</code> | The reader found no records. Treat the run as an empty-input validation failure, confirm the input path is correct, and rerun with a non-empty file or directory. |
+| Output shards do not appear under <code>output_dir</code> after the run reports success | The writer emits partitioned files, not a single merged file. Inspect the shard pattern under <code>output_dir</code> and confirm <code>output_format</code> matches what downstream consumers expect. See [Input and Output Format](/io-format). |
+
+## FAITH Evaluation
+
+| Symptom | What to do |
+| --- | --- |
+| Every translated row is dropped after FAITH runs | The <code>faith_eval.threshold</code> value may be too strict for the chosen scorer model. Lower the threshold, set <code>faith_eval.filter_enabled=false</code> while you tune, or override the scorer with <code>faith_eval.model_name</code>. See [Run FAITH Evaluation](/../how-to/run-faith-evaluation). |
+| FAITH scores look inconsistent across runs of the same data | Pin both <code>server.model</code> and <code>faith_eval.model_name</code> to specific identifiers so scorer drift does not move the threshold under you. See [FAITH Evaluation Inside Translation](/../explanation/faith-evaluation). |
+
+## Related Reference
+
+- Translation YAML fields: [Translation YAML Reference](/translate-config)
+
+- CLI syntax: [CLI Reference for Translation](/cli-translation)
+
+- Input and output shapes: [Input and Output Format](/io-format)

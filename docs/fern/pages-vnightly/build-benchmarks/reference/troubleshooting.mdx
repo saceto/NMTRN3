@@ -1,0 +1,61 @@
+---
+title: "Troubleshooting"
+slug: "build-benchmarks/reference/troubleshooting.html"
+description: "This page lists common symptoms when you run nemotron steps run byob/mcq with the bring your own benchmark (BYOB) multiple choice question (MCQ) family and when you tune BYOB translation settings. Eac"
+---
+
+{/* SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  SPDX-License-Identifier: Apache-2.0 */}
+
+{/* Reference: symptom-to-remedy tables for bring your own benchmark MCQ runs and translation YAML checks. */}
+
+This page lists common symptoms when you run `nemotron steps run byob/mcq` with the bring your own benchmark (BYOB) multiple choice question (MCQ) family and when you tune BYOB translation settings.
+Each table row pairs a symptom with the files, fields, or flags you should inspect first.
+For stage flow and design rationale, see the explanation pages linked from [Concepts](/../explanation/index).
+
+## Configuration Rejected Before the Pipeline Runs
+
+| Symptom | What to do |
+| --- | --- |
+| Assertion that <code>tags</code> should not be specified when <code>metadata_file</code> is absent | Remove <code>tags</code> from every <code>target_source_mapping</code> entry, or set top-level <code>metadata_file</code> to the comma-separated values (CSV) file that supplies tag metadata. See [Prepare Your Own Domain Data](/../how-to/prepare-data). |
+| Assertion that BYOB translation does not support FAITH evaluation | Under <code>translation_model_config.stage</code>, set <code>enable_faith_eval</code> to false or omit the field. BYOB translation expects <code>backtranslation_quality_metrics</code> instead of FAITH. See [Translation Configuration Reference](/translation-config) and [Translation](/../explanation/translation). |
+| Message that a prompt override key is missing or is not a string, or validation fails on <code>prompt_config</code> | Open your <code>prompt_config</code> YAML and match the structure in [Prompt Tuning for Benchmarks](/../how-to/prompt-tuning). Easiness and hallucination overrides must include the expected blocks. |
+| Schema validation reports that <code>distractor_validity_model_config</code> is missing | The current generation schema requires this block even when distractor expansion is off. Add the block as described in [Configure Model Endpoints for BYOB](/../how-to/custom-model-endpoints). |
+
+## Skipped Stages and Missing Parquet Inputs
+
+| Symptom | What to do |
+| --- | --- |
+| A stage fails because an expected Parquet file is missing under <code>output_dir/&lt;expt_name&gt;/stage_cache/</code> | When you use <code>skip_until</code>, every stage before the resume point must have written its output file to disk. Rerun from an earlier stage without skipping, or copy valid caches from a prior run. See [Skip Stages When Iterating](/../how-to/skip-stages). |
+
+## Generation Ends With No Final Benchmark Rows
+
+| Symptom | What to do |
+| --- | --- |
+| Log line <code>No questions left after filtering</code>, or <code>benchmark.parquet</code> is missing after a run that exited early | Open <code>stage_cache/filtered_questions.parquet</code> and inspect <code>is_easy</code>, <code>is_hallucination</code>, and score columns. Loosen <code>easiness_threshold</code> or <code>hallucination_threshold</code>, set <code>remove_easy</code> and <code>remove_hallucinated</code> to false for a diagnostic run, or adjust upstream judgement and deduplication settings. See [Easiness and Hallucination Filtering](/../explanation/filtering). |
+
+## Translation Export Drops Every Row
+
+| Symptom | What to do |
+| --- | --- |
+| <code>benchmark.parquet</code> exists but has zero rows after translation | When <code>remove_low_quality</code> is true, only rows with <code>is_quality_metric_passed</code> are exported. Inspect <code>stage_cache/quality_metrics.parquet</code>, relax metric thresholds in <code>backtranslation_quality_metrics</code>, or set <code>remove_low_quality</code> to false while you tune. See [Translation](/../explanation/translation). |
+
+## Few-Shot Sampling Finds No Rows
+
+| Symptom | What to do |
+| --- | --- |
+| Runtime error stating there are no samples for a given source subject and tag combination | Tag filters must match comma-separated tag strings that appear in the metadata CSV for that Hugging Face subject. Widen <code>tags</code>, correct the CSV, or confirm <code>source_subjects</code> and <code>target_source_mapping</code> names align with [Prepare Your Own Domain Data](/../how-to/prepare-data) and [Getting the Right Questions From the Source Benchmark](/../explanation/get-right-questions). |
+
+## Hosted Models Throttle or Stall
+
+| Symptom | What to do |
+| --- | --- |
+| Timeouts, HTTP responses in the 429 range, or bursty failures when calling remote endpoints | Reduce <code>max_parallel_requests</code> and related batch settings in your YAML, rerun on a smaller slice of data, and confirm API keys and quotas. See [Question Generation](/../explanation/question-generation) and [Configure Model Endpoints for BYOB](/../how-to/custom-model-endpoints). |
+
+## Related Reference
+
+- Parquet layout and final column list: [Output Files](/output-files)
+
+- Generation YAML fields: [Generation Configuration Reference](/generate-config)
+
+- Translation YAML fields: [Translation Configuration Reference](/translation-config)

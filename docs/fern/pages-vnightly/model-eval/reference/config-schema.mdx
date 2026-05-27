@@ -1,0 +1,287 @@
+---
+title: "Configuration Reference"
+slug: "model-eval/reference/config-schema.html"
+description: "This page documents the YAML schema consumed by nemotron steps run eval/model_eval. The step is a thin wrapper around NeMo Evaluator Launcher: it loads a YAML config, applies Hydra-style overrides, re"
+---
+
+{/* SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  SPDX-License-Identifier: Apache-2.0 */}
+
+<Anchor id="model-eval-config-schema"></Anchor>
+
+This page documents the YAML schema consumed by `nemotron steps run eval/model_eval`.
+The step is a thin wrapper around NeMo Evaluator Launcher: it loads a YAML config, applies Hydra-style overrides, removes Nemotron-only keys, saves a launcher config, and calls `nemo_evaluator_launcher.api.functional.run_eval`.
+
+## Sample Configs
+
+| Config | Purpose |
+| --- | --- |
+| <code>tiny_chat.yaml</code> | Hosted chat endpoint smoke test. Uses <code>deployment.type: none</code>, <code>target.api_endpoint.*</code>, and one configured task, <code>mmlu_instruct</code>. |
+| <code>default.yaml</code> | Megatron Bridge checkpoint evaluation through NeMo Evaluator Launcher. Uses launcher-managed <code>execution</code>, <code>deployment</code>, <code>evaluation</code>, and <code>tasks</code> sections. |
+
+## Top-Level Keys
+
+```yaml startLine={1}
+# Tiny hosted chat endpoint smoke-test config.
+#
+# Export endpoint settings before running:
+#   export NEMO_EVALUATOR_MODEL_ID=\<exact model id>
+#   export NEMO_EVALUATOR_MODEL_URL=\<OpenAI-compatible chat completions endpoint URL>
+#   export NEMO_EVALUATOR_API_KEY_NAME=NVIDIA_API_KEY
+#   export NEMO_EVALUATOR_ENDPOINT_TYPE=chat
+
+dry_run: false
+output_dir: ./results-tiny-chat
+task_filters: null
+
+execution:
+  type: local
+  mode: sequential
+  output_dir: $\{output_dir\}
+
+deployment:
+  type: none
+
+target:
+  api_endpoint:
+    model_id: ${oc.env:NEMO_EVALUATOR_MODEL_ID,''}
+    url: ${oc.env:NEMO_EVALUATOR_MODEL_URL,''}
+    api_key_name: ${oc.env:NEMO_EVALUATOR_API_KEY_NAME,NVIDIA_API_KEY}
+    type: ${oc.env:NEMO_EVALUATOR_ENDPOINT_TYPE,chat}
+
+evaluation:
+  nemo_evaluator_config:
+    config:
+      params:
+        temperature: 0.0
+        top_p: 1.0
+        max_new_tokens: 1024
+        max_retries: 5
+        parallelism: 1
+        request_timeout: 3600
+        limit_samples: 1
+    target:
+      api_endpoint:
+        adapter_config:
+          output_dir: /results
+          use_progress_tracking: false
+          use_caching: true
+          caching_dir: /results/cache
+          use_response_logging: true
+          max_logged_responses: 5
+          use_request_logging: true
+          max_logged_requests: 5
+  tasks:
+    - name: mmlu_instruct
+```
+
+```yaml startLine={1}
+# Standard NeMo Evaluator Launcher config for Megatron checkpoint evaluation.
+#
+# This mirrors the Nano3/Super3 eval shape: the `run` section is used by
+# Nemotron for env/profile/artifact interpolation, then removed before handing
+# the config to NeMo Evaluator Launcher.
+
+dry_run: false
+output_dir: ./results
+
+run:
+  # Use a concrete Megatron Bridge iter_* checkpoint via
+  # `deployment.checkpoint_path=...`, or keep this as a W&B artifact reference
+  # consumed by `${art:model,path}`.
+  model: model:latest
+  env:
+    executor: local
+    container_image: nvcr.io/nvidia/nemo:25.11.nemotron_3_nano
+    host: ${oc.env:HOSTNAME,localhost}
+    user: ${oc.env:USER,''}
+    account: null
+    partition: null
+    remote_job_dir: ${oc.env:PWD}/.nemotron
+    time: "04:00:00"
+  wandb:
+    entity: null
+    project: null
+
+execution:
+  type: ${run.env.executor}
+  hostname: ${run.env.host}
+  username: ${run.env.user}
+  account: ${run.env.account}
+  partition: ${run.env.partition}
+  output_dir: $\{output_dir\}
+  walltime: ${run.env.time}
+  num_nodes: ${oc.select:run.env.nodes,1}
+  deployment:
+    n_tasks: ${execution.num_nodes}
+  auto_export:
+    destinations:
+      - wandb
+  env_vars:
+    deployment:
+      HF_HOME: ${run.env.remote_job_dir}/hf
+      HF_TOKEN: HF_TOKEN
+      NIM_CACHE_PATH: ${run.env.remote_job_dir}/nim
+      VLLM_CACHE_ROOT: ${run.env.remote_job_dir}/vllm
+    evaluation:
+      HF_HOME: ${run.env.remote_job_dir}/hf
+      HF_TOKEN: HF_TOKEN
+  mounts:
+    deployment: {}
+    evaluation: {}
+    mount_home: false
+
+deployment:
+  type: generic
+  image: ${run.env.container_image}
+  checkpoint_path: ${art:model,path}
+  multiple_instances: false
+  port: 1235
+  served_model_name: nemo-model
+  health_check_path: /v1/health
+  command: >-
+    bash -c 'export TRITON_CACHE_DIR=/tmp/triton_cache;
+    python /opt/Export-Deploy/scripts/deploy/nlp/deploy_ray_inframework.py
+    --megatron_checkpoint /checkpoint/
+    --num_gpus ${oc.select:run.env.gpus_per_node,1}
+    --tensor_model_parallel_size 1
+    --expert_model_parallel_size 1
+    --port 1235
+    --num_replicas 1'
+  endpoints:
+    chat: /v1/chat/completions/
+    completions: /v1/completions/
+    health: /v1/health
+
+evaluation:
+  nemo_evaluator_config:
+    config:
+      params:
+        max_retries: 5
+        parallelism: 4
+        request_timeout: 6000
+        limit_samples: null
+        extra:
+          tokenizer: ${deployment.checkpoint_path}/tokenizer
+          tokenizer_backend: huggingface
+    target:
+      api_endpoint:
+        adapter_config:
+          output_dir: /results
+          use_progress_tracking: false
+          use_caching: true
+          caching_dir: /results/cache
+          use_response_logging: true
+          max_logged_responses: 10
+          use_request_logging: true
+          max_logged_requests: 10
+  tasks:
+    - name: adlr_mmlu
+      nemo_evaluator_config:
+        config:
+          params:
+            top_p: 0.0
+    - name: hellaswag
+
+export:
+  wandb:
+    entity: ${run.wandb.entity}
+    project: ${run.wandb.project}
+```
+
+| Key | Used By | Purpose |
+| --- | --- | --- |
+| <code>dry_run</code> | Nemotron runtime | Passed to NeMo Evaluator Launcher as <code>run_eval(..., dry_run=...)</code>. |
+| <code>output_dir</code> | Nemotron runtime | Copied into <code>execution.output_dir</code> before launcher dispatch. |
+| <code>task_filters</code> | Nemotron runtime | Optional task-name subset passed to launcher. |
+| <code>run</code> | Nemotron runtime | Nemotron-side artifact, environment, and W&B interpolation. Removed before launcher dispatch. |
+| <code>execution</code> | NeMo Evaluator Launcher | Where and how launcher execution runs. |
+| <code>deployment</code> | NeMo Evaluator Launcher | How the evaluated model is deployed, or <code>type: none</code> for an existing endpoint. |
+| <code>target</code> | NeMo Evaluator Launcher | Existing API endpoint metadata for hosted evaluation. |
+| <code>evaluation</code> | NeMo Evaluator Launcher | Evaluator config, generation params, logging, caching, and adapter settings. |
+| <code>tasks</code> | NeMo Evaluator Launcher | Exact task entries to run. Each entry has a <code>name</code>. |
+| <code>export</code> | NeMo Evaluator Launcher | Optional export settings, such as W&B export. |
+
+## Hosted Endpoint Fields
+
+Use these fields with `tiny_chat.yaml` or any config that sets `deployment.type: none`.
+
+| Field | Purpose |
+| --- | --- |
+| <code>target.api_endpoint.model_id</code> | Exact model id advertised by the endpoint. |
+| <code>target.api_endpoint.url</code> | Full OpenAI-compatible endpoint URL, including <code>/v1/chat/completions</code> or <code>/v1/completions</code>. |
+| <code>target.api_endpoint.api_key_name</code> | Environment variable name that holds the bearer token. Never put the secret value in config. |
+| <code>target.api_endpoint.type</code> | Endpoint type, usually <code>chat</code> for hosted chat smoke tests. |
+
+The `tiny_chat.yaml` file reads these values from `NEMO_EVALUATOR_MODEL_ID`, `NEMO_EVALUATOR_MODEL_URL`, `NEMO_EVALUATOR_API_KEY_NAME`, and `NEMO_EVALUATOR_ENDPOINT_TYPE`.
+
+## Evaluation Params
+
+Generation and evaluator controls live under:
+
+```text
+evaluation.nemo_evaluator_config.config.params
+```
+
+Common fields are:
+
+| Field | Purpose |
+| --- | --- |
+| <code>temperature</code> | Sampling temperature for generation tasks. |
+| <code>top_p</code> | Top-p nucleus sampling. |
+| <code>max_new_tokens</code> | Maximum generated tokens for chat/instruction tasks. |
+| <code>max_retries</code> | Request retry count. |
+| <code>parallelism</code> | Request concurrency where supported. |
+| <code>request_timeout</code> | Per-request timeout in seconds. |
+| <code>limit_samples</code> | Optional per-task sample cap. Use <code>1</code> for smoke tests. |
+| <code>extra.tokenizer</code> | Tokenizer path or Hugging Face id required by log-probability tasks. |
+| <code>extra.tokenizer_backend</code> | Tokenizer backend, usually <code>huggingface</code>. |
+
+## Tasks
+
+Tasks are NeMo Evaluator Launcher task entries.
+Use exact task IDs from the installed launcher, for example:
+
+```bash
+nemo-evaluator-launcher ls tasks
+nemo-evaluator-launcher ls task mmlu_instruct
+```
+
+The sample configs define these starting points.
+
+| Config | Tasks |
+| --- | --- |
+| <code>tiny_chat.yaml</code> | <code>mmlu_instruct</code> |
+| <code>default.yaml</code> | <code>adlr_mmlu</code>, <code>hellaswag</code> |
+
+Do not prepend a harness name unless the launcher lists that exact dotted task id.
+
+## Checkpoint Deployment Fields
+
+The `default.yaml` config uses launcher-managed deployment for a Megatron Bridge checkpoint.
+The most common override is:
+
+```bash
+deployment.checkpoint_path=/path/to/iter_0001000
+```
+
+Use the concrete `iter_*` checkpoint directory, not just the parent training output directory.
+For log-probability tasks, keep the tokenizer aligned with the deployed checkpoint through `evaluation.nemo_evaluator_config.config.params.extra.tokenizer`.
+
+## Validation Behavior
+
+Nemotron does not implement a separate benchmark loop for this step.
+It validates only enough to build the launcher config and import NeMo Evaluator Launcher.
+Endpoint checks, task validation, result writing, and launcher invocation state are owned by NeMo Evaluator Launcher.
+
+## Related
+
+- [CLI Reference](/cli-reference) for command-line flags and Hydra override syntax.
+
+- [Tasks Catalog](/benchmarks-catalog) for task identifiers grouped by endpoint family.
+
+- [Output Artifacts](/output-artifacts) for the `eval_results` contract and the on-disk layout.
+
+- [Troubleshooting](/troubleshooting) for common launcher and config failures.
+
+- `src/nemotron/steps/eval/model_eval/step.toml` for the full step contract.
