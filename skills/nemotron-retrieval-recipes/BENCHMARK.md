@@ -55,8 +55,9 @@ The dataset contains 14 realistic task cases in `evals/evals.json`:
 
 | Metric | Num | Codex | Claude Code |
 | --- | ---: | --- | --- |
-| Static quality score | 1 skill | 100/100 before rename/layout change; rerun required | Not agent-specific |
-| Command freshness checklist | 6 representative commands | Passed manually in current checkout before rename/layout change; rerun required | Not agent-specific |
+| Eval dataset validation | 14 tasks | Passed (`astra-skill-eval validate`) | Not agent-specific |
+| Static quality score | 1 skill | 100/100 after rename/layout change (`astra-skill-eval evaluate --static`) | Not agent-specific |
+| Command freshness checklist | 6 representative commands | Passed manually after rename/layout change in current checkout | Not agent-specific |
 | Live overall score (original set) | 4 tasks | 0.90 with skill vs 0.66 without skill (+0.24) | Baseline/lift pending |
 | Live with-skill score (expanded set) | 12 tasks | Not rerun | 0.86 |
 | Task completion | 12-task Claude run | Not rerun | 12/12 scored attempts with skill |
@@ -78,4 +79,4 @@ The eval setup compares with-skill and without-skill performance, keeps generate
 
 The Claude Code with-skill live run completed 12/12 scored attempts after explicit approval for provider-backed evaluation. Full Claude Code with/without lift was attempted, but the baseline leg was invalid because two baseline attempts failed in the evaluation harness (`AgentTimeoutError` and a tool-schema API error). Do not use the partial lift scores for pass/fail or model comparison.
 
-Before publication, rerun static validation and live with/without evaluation on the 14-case dataset for both Codex and Claude Code, then update the result table with task completion, agent wall-clock time, and token consumption.
+Before publication, rerun live with/without evaluation on the 14-case dataset for both Codex and Claude Code, then update the result table with task completion, agent wall-clock time, and token consumption. Local structure validation, static evaluation, and command freshness checks passed after the rename/layout change.

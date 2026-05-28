@@ -22,7 +22,7 @@ description: Use when planning, debugging, tuning, evaluating, exporting, or dep
 
 Use this skill to work with public Nemotron embedding and reranking retrieval recipes in a source checkout or installed package. Prefer the current checkout over memory, because the recipe CLI, configs, containers, and output paths are actively changing. Treat each recipe family as available only after its recipe directory and matching CLI files are present.
 
-This is a public product skill, not internal contributor guidance. Its value over static docs is to make an agent route the user's retrieval failure to the right recipe family, reconcile docs with the current checkout, avoid accidental long-running launches, preserve secrets, and return concrete preview/execution/run-report commands.
+This is a public product skill, not contributor-only guidance. Its value over static docs is to make an agent route the user's retrieval failure to the right recipe family, reconcile docs with the current checkout, avoid accidental long-running launches, preserve secrets, and return concrete preview/execution/run-report commands.
 
 ## Prerequisites
 
