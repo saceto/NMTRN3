@@ -57,8 +57,6 @@ def test_execute_uv_local_uses_stage_project_lock(monkeypatch) -> None:
         "/usr/bin/uv",
         "run",
         "--with",
-        str(repo_root),
-        "--with",
         "demo-extra",
         "--project",
         str(stage_dir),
@@ -72,7 +70,39 @@ def test_execute_uv_local_uses_stage_project_lock(monkeypatch) -> None:
         str(train_path),
         "model.foo=bar",
     ]
+    assert ["--with", str(repo_root)] not in [calls[0][0][i : i + 2] for i in range(len(calls[0][0]) - 1)]
     assert "VIRTUAL_ENV" not in calls[0][1]["env"]
+
+
+def test_execute_uv_local_resolves_repo_relative_script_path(monkeypatch) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    stage_dir = repo_root / "src" / "nemotron" / "recipes" / "embed" / "stage2_finetune"
+    script_path = Path("src/nemotron/recipes/embed/stage2_finetune/train.py")
+    train_path = Path("/tmp/train.yaml")
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append((cmd, kwargs))
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr("shutil.which", lambda name: "/usr/bin/uv" if name == "uv" else None)
+    monkeypatch.setattr(execution.subprocess, "run", fake_run)
+
+    with pytest.raises(typer.Exit):
+        execution.execute_uv_local(
+            script_path=script_path,
+            stage_dir=stage_dir,
+            repo_root=repo_root,
+            train_path=train_path,
+            passthrough=[],
+        )
+
+    assert calls[0][0][-4:] == [
+        "python",
+        str(repo_root / script_path),
+        "--config",
+        str(train_path),
+    ]
 
 
 def test_execute_uv_local_preserves_nested_relative_script_path(monkeypatch) -> None:
@@ -97,7 +127,8 @@ def test_execute_uv_local_preserves_nested_relative_script_path(monkeypatch) -> 
             passthrough=[],
         )
 
-    assert calls[0][0][-3:] == [
+    assert calls[0][0][-4:] == [
+        "python",
         str(stage_dir / "scripts" / "train.py"),
         "--config",
         str(train_path),
