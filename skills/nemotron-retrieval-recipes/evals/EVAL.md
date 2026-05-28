@@ -4,15 +4,26 @@ This skill follows a functional skill evaluation approach: define realistic task
 
 ## Evaluation Goals
 
-The evaluation is functional: it checks whether agents use the skill when retrieval recipe expertise is needed, avoid it for unrelated tasks, and produce better task outcomes with the skill than without it.
+The evaluation is functional: it checks whether agents use the skill when public Nemotron retrieval recipe expertise is needed, avoid it for unrelated tasks, and produce better task outcomes with the skill than without it. Because these recipes are long-running, wall-clock recipe completion is not the main success signal. The useful lift is whether the skill helps the agent route to the right recipe family, ground itself in the current checkout, choose safe dry-runs before expensive stages, preserve secrets, interpret metrics correctly, and hand off long-running execution with clear run reports.
 
 ## Dataset Rules
 
 - Keep prompts realistic. Do not name the skill in user prompts.
-- Include positive cases for embedding planning, reranker selection, deployment debugging, stale artifact diagnosis, secret-safe setup, prerequisite gating, remote execution, metric interpretation, stage readiness, and export/deploy boundary debugging.
+- Include positive cases for embedding planning, reranker selection, deployment debugging, stale artifact diagnosis, secret-safe setup, prerequisite gating, remote execution, long-running job boundaries, docs-to-checkout reconciliation, metric interpretation, stage readiness, and export/deploy boundary debugging.
 - Include negative cases where the skill should not activate, including unrelated factual questions and generic vector database advice.
 - Keep `expected_skill`, `ground_truth`, and ordered `expected_behavior` entries explicit enough for deterministic and judge-based grading.
 - Do not commit generated `evals/results/` output; commit only reusable fixtures and summary reports.
+
+## Usefulness Rubric
+
+Score agent usefulness above raw runtime. Strong with-skill trajectories should:
+
+- activate on public Nemotron `embed`/`rerank` recipe tasks and stay inactive for generic retrieval or vector database advice,
+- inspect or cite the current repo surface before relying on stale docs or memory,
+- choose `embed` vs `rerank` from the retrieval failure mode,
+- recommend help/dry-run checks before API, GPU, Docker, Slurm, NIM, or other long-running work,
+- handle secrets through environment configuration without asking users to paste values,
+- separate preview commands, execution commands, polling cadence, and compact run reports.
 
 ## Required Checks
 
@@ -47,4 +58,5 @@ After live evaluation, update `BENCHMARK.md` with:
 - metric names,
 - test dataset size,
 - with-skill score, without-skill score, and uplift,
+- task completion and wall-clock/token data for the agent harness, making clear that this is agent-evaluation cost rather than expected recipe training runtime,
 - limitations or skipped agents.

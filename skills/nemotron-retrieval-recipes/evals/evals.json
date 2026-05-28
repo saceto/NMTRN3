@@ -152,5 +152,31 @@
       "The agent focused on TensorRT-specific export settings and profiles",
       "The agent kept eval data, checkpoint path, prompt template, and sequence length fixed across comparisons"
     ]
+  },
+  {
+    "id": "nemotron-retrieval-recipes-long-running-boundary-001",
+    "question": "The rerank dry-run is clean and I want to start the full prep-through-eval run. These stages may take hours. What should the agent do differently from a quick command preview?",
+    "expected_skill": "nemotron-retrieval-recipes",
+    "expected_script": null,
+    "ground_truth": "The agent should use the skill, treat runtime as an operational boundary rather than the primary success metric, confirm the user really wants execution, choose a session-safe launch or remote batch mode, capture the exact command/config/output path, and propose human-scale polling and run reports instead of tight loops.",
+    "expected_behavior": [
+      "The agent read the nemotron-retrieval-recipes SKILL.md before taking action",
+      "The agent separated the already-validated preview from the real long-running execution command",
+      "The agent recommended session-safe execution, remote batch mode, or another durable run pattern",
+      "The agent planned human-scale polling and a compact run report with command, config, outputs, and next validation signal"
+    ]
+  },
+  {
+    "id": "nemotron-retrieval-recipes-docs-integration-001",
+    "question": "A doc snippet I saved says to run an older `nemotron rerank export` command, but this branch has changed a few times. How should we reconcile the docs with the current checkout before exporting?",
+    "expected_skill": "nemotron-retrieval-recipes",
+    "expected_script": null,
+    "ground_truth": "The agent should use the skill, prefer the current checkout over stale docs, inspect the public recipe and CLI surfaces, run or propose read-only help/dry-run checks such as `uv run --no-sync nemotron rerank export --help` and a dry-run export command, and call out which file paths or help output are authoritative before recommending an export command.",
+    "expected_behavior": [
+      "The agent read the nemotron-retrieval-recipes SKILL.md before taking action",
+      "The agent treated docs as useful context but not as more authoritative than the current checkout",
+      "The agent named the recipe, CLI, and config paths it would inspect",
+      "The agent used help/dry-run verification before recommending a potentially expensive export"
+    ]
   }
 ]
