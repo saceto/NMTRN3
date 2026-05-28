@@ -19,10 +19,10 @@ from nemotron.recipes.rerank.stage5_deploy import deploy as deploy_module
 from nemotron.recipes.rerank.stage5_deploy.deploy import DeployConfig, _api_base_url, build_docker_command
 
 
-def test_finetune_auto_scale_preserves_global_batch_size():
+def test_finetune_auto_scales_default_global_batch_size_for_small_dataset():
     cfg = FinetuneConfig(global_batch_size=128, checkpoint_every_steps=100, val_every_steps=100)
-    global_batch_size, *_ = _auto_scale_hyperparams(cfg, num_examples=500)
-    assert global_batch_size == 128
+    global_batch_size, *_ = _auto_scale_hyperparams(cfg, num_examples=810)
+    assert global_batch_size == 64
 
 
 def test_finetune_rejects_untrusted_remote_code_without_opt_in():

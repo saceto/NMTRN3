@@ -434,7 +434,7 @@ def create_train_val_test_split(
     
     # Get unique files/bundles - convert lists to tuples for hashability
     # file_name is now always a list (e.g., ['doc.txt'] or ['a.txt', 'b.txt'])
-    unique_file_tuples = list(set(
+    unique_file_tuples = sorted(set(
         tuple(f) if isinstance(f, list) else (f,) 
         for f in filtered_qa_df['file_name']
     ))

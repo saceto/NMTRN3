@@ -3,8 +3,14 @@
 from __future__ import annotations
 
 import json
+import random
 
-from nemotron.recipes.embed.stage1_data_prep.scripts.convert_to_retriever_data import load_generated_json_files
+import pandas as pd
+
+from nemotron.recipes.embed.stage1_data_prep.scripts.convert_to_retriever_data import (
+    create_train_val_test_split,
+    load_generated_json_files,
+)
 
 
 def _record(name: str) -> dict:
@@ -36,3 +42,24 @@ def test_load_generated_json_file_falls_back_to_jsonl(tmp_path):
 
     assert len(df) == 2
     assert df["file_name"].tolist() == [["a.txt"], ["b.txt"]]
+
+
+def test_train_val_test_split_orders_files_before_seeded_shuffle():
+    df = pd.DataFrame(
+        [
+            {"file_name": ["z.txt"], "query": "z"},
+            {"file_name": ["a.txt"], "query": "a"},
+            {"file_name": ["m.txt"], "query": "m"},
+            {"file_name": ["b.txt"], "query": "b"},
+        ]
+    )
+
+    train_df, _, test_df = create_train_val_test_split(df, train_ratio=0.5, val_ratio=0.0, seed=13)
+
+    expected_files = [("a.txt",), ("b.txt",), ("m.txt",), ("z.txt",)]
+    random.Random(13).shuffle(expected_files)
+    expected_train = {item[0] for item in expected_files[:2]}
+    expected_test = {item[0] for item in expected_files[2:]}
+
+    assert {row[0] for row in train_df["file_name"]} == expected_train
+    assert {row[0] for row in test_df["file_name"]} == expected_test
