@@ -1,5 +1,5 @@
 ---
-name: retriever-finetune-recipe
+name: nemotron-retrieval-recipes
 version: "0.1.0"
 author: "NVIDIA"
 tags:
@@ -12,14 +12,14 @@ tools:
   - shell
   - read
   - write
-description: Use when planning, debugging, tuning, evaluating, exporting, or deploying Nemotron `embed`/`rerank` retrieval recipes.
+description: Use when planning, debugging, tuning, evaluating, exporting, or deploying public Nemotron `embed`/`rerank` retrieval recipes.
 ---
 
-# Retriever Fine-Tune Recipe
+# Nemotron Retrieval Recipes
 
 ## Purpose
 
-Use this skill to work with Nemotron embedding and reranking fine-tuning recipes in a source checkout or installed package. Prefer the current checkout over memory, because the recipe CLI, configs, containers, and output paths are actively changing. Treat each recipe family as available only after its recipe directory and matching CLI files are present.
+Use this skill to work with public Nemotron embedding and reranking retrieval recipes in a source checkout or installed package. Prefer the current checkout over memory, because the recipe CLI, configs, containers, and output paths are actively changing. Treat each recipe family as available only after its recipe directory and matching CLI files are present.
 
 ## Prerequisites
 
@@ -98,7 +98,7 @@ For failures, load `PITFALLS.md` first. Localize the failing stage, then inspect
 
 - This skill guides agents; it does not bundle recipe code or run GPU, Docker, NIM, Slurm, or provider API work on its own.
 - It assumes the current checkout contains the `embed` or `rerank` recipe before treating that family as available.
-- It should not trigger for unrelated retrieval theory, generic vector database setup, or benchmark evaluation that is not tied to the Nemotron recipe flow.
+- It should not trigger for unrelated retrieval theory, generic vector database setup, or benchmark evaluation that is not tied to the public Nemotron recipe flow.
 
 ## Output Style
 

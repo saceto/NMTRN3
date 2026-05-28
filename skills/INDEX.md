@@ -8,6 +8,7 @@ its own `SKILL.md` (frontmatter + body) and lives in a sibling directory.
 | Skill | Use when |
 |---|---|
 | **[/nemotron-customize](nemotron-customize/SKILL.md)** | The user wants to **build a pipeline** — fine-tune, pretrain, align, evaluate, optimize a model end-to-end. Composes steps from [src/nemotron/steps/](../src/nemotron/steps/) into a runnable Python project. |
+| **[/nemotron-retrieval-recipes](nemotron-retrieval-recipes/SKILL.md)** | The user wants to **operate public Nemotron retrieval recipes** — choose `embed` vs `rerank`, plan long-running stages safely, dry-run current CLI/configs, debug metrics, or prepare export/deploy. |
 | **[/nemotron-nano3](nemotron-nano3/SKILL.md)** | The user wants **facts about Nano3** — architecture, training data, recipe details, eval scores, deployment notes. Reference, not generation. |
 | **[/nemotron-super3](nemotron-super3/SKILL.md)** | Same as above, for **Super3**. |
 | **[/nemotron-add-step](nemotron-add-step/SKILL.md)** | A contributor wants to **add a new step** to the catalog under [src/nemotron/steps/](../src/nemotron/steps/). |

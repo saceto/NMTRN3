@@ -1,6 +1,6 @@
 # Evaluation Report
 
-Evaluation of the `retriever-finetune-recipe` skill, which guides agents through Nemotron embedding and reranking fine-tuning recipe work.
+Evaluation of the `nemotron-retrieval-recipes` skill, which guides agents through Nemotron embedding and reranking fine-tuning recipe work.
 
 ## Conformance Status
 
@@ -34,18 +34,18 @@ The dataset contains 12 realistic task cases in `evals/evals.json`:
 
 | Task | Type |
 | --- | --- |
-| `retriever-finetune-recipe-embed-plan-001` | Positive: embedding recipe planning |
-| `retriever-finetune-recipe-rerank-choice-001` | Positive: embedder vs reranker choice |
-| `retriever-finetune-recipe-deploy-debug-001` | Positive: reranker NIM deployment debugging |
-| `retriever-finetune-recipe-negative-001` | Negative: unrelated factual question |
-| `retriever-finetune-recipe-negative-vector-db-001` | Negative: generic vector database advice |
-| `retriever-finetune-recipe-secret-handling-001` | Positive: secret-safe Stage 0 planning |
-| `retriever-finetune-recipe-stale-artifacts-001` | Positive: stale artifact diagnosis |
-| `retriever-finetune-recipe-prereq-gap-001` | Positive: prerequisite gate before GPU work |
-| `retriever-finetune-recipe-remote-batch-001` | Positive: remote batch planning |
-| `retriever-finetune-recipe-metrics-nuance-001` | Positive: nuanced metrics interpretation |
-| `retriever-finetune-recipe-stage-readiness-001` | Positive: stage readiness from raw docs |
-| `retriever-finetune-recipe-export-boundary-001` | Positive: TensorRT export boundary debugging |
+| `nemotron-retrieval-recipes-embed-plan-001` | Positive: embedding recipe planning |
+| `nemotron-retrieval-recipes-rerank-choice-001` | Positive: embedder vs reranker choice |
+| `nemotron-retrieval-recipes-deploy-debug-001` | Positive: reranker NIM deployment debugging |
+| `nemotron-retrieval-recipes-negative-001` | Negative: unrelated factual question |
+| `nemotron-retrieval-recipes-negative-vector-db-001` | Negative: generic vector database advice |
+| `nemotron-retrieval-recipes-secret-handling-001` | Positive: secret-safe Stage 0 planning |
+| `nemotron-retrieval-recipes-stale-artifacts-001` | Positive: stale artifact diagnosis |
+| `nemotron-retrieval-recipes-prereq-gap-001` | Positive: prerequisite gate before GPU work |
+| `nemotron-retrieval-recipes-remote-batch-001` | Positive: remote batch planning |
+| `nemotron-retrieval-recipes-metrics-nuance-001` | Positive: nuanced metrics interpretation |
+| `nemotron-retrieval-recipes-stage-readiness-001` | Positive: stage readiness from raw docs |
+| `nemotron-retrieval-recipes-export-boundary-001` | Positive: TensorRT export boundary debugging |
 
 ## Results
 
