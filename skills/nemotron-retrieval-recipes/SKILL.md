@@ -1,7 +1,7 @@
 ---
 name: nemotron-retrieval-recipes
 version: "0.1.0"
-author: "NVIDIA Nemotron Team"
+author: "NVIDIA Nemotron Team <noreply@nvidia.com>"
 license: Apache-2.0
 tags:
   - nemotron
@@ -10,7 +10,7 @@ tags:
   - embeddings
   - reranking
 metadata:
-  author: "NVIDIA Nemotron Team"
+  author: "NVIDIA Nemotron Team <noreply@nvidia.com>"
   tags:
     - nemotron
     - retrieval
