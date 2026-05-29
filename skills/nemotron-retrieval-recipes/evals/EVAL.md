@@ -52,7 +52,9 @@ uv run --no-sync nemotron rerank eval -c default -d eval_nim=true eval_base=fals
 
 ## Reporting
 
-After live evaluation, update `BENCHMARK.md` with:
+Review the CI-generated `BENCHMARK.md` before merge. Do not hand-maintain a committed benchmark report for this skill unless the repository process changes.
+
+The generated benchmark should include:
 
 - agent harness and model versions, or public-safe aliases when model route names should not be published,
 - metric names,
@@ -60,3 +62,5 @@ After live evaluation, update `BENCHMARK.md` with:
 - with-skill score, without-skill score, and uplift,
 - task completion and wall-clock/token data for the agent harness, making clear that this is agent-evaluation cost rather than expected recipe training runtime,
 - limitations or skipped agents.
+
+Treat any remaining generated findings as public-facing. Tier 1 high/critical findings must be fixed before merge unless they are confirmed false positives; lower-tier findings should still be reviewed and either fixed, accepted as non-blocking risk, or identified as false positives or run-to-run variance.
