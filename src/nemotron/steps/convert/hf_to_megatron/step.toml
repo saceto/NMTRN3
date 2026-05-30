@@ -85,11 +85,6 @@ name = "torchrun.nproc_per_node"
 description = "Number of local ranks used by the distributed converter. Defaults to NEMOTRON_CONVERT_NPROC_PER_NODE or 8."
 default = 8
 
-[[parameters]]
-name = "script.path"
-description = "Path to Megatron-Bridge's convert_checkpoints_multi_gpu.py inside the conversion container."
-default = "/opt/Megatron-Bridge/examples/conversion/convert_checkpoints_multi_gpu.py"
-
 [[strategies]]
 when = "A Megatron-Bridge consumer needs an HF-produced checkpoint"
 then = "Insert this converter explicitly instead of changing the downstream trainer to accept HF layout."

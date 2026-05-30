@@ -23,8 +23,6 @@ path. Developers usually change:
   `tp=1 pp=1 ep=8 etp=1` for Nemotron MoE conversion.
 - `torchrun.nproc_per_node`: local ranks for conversion. Defaults to
   `NEMOTRON_CONVERT_NPROC_PER_NODE` or `8`.
-- `script.path`: path to the `convert_checkpoints_multi_gpu.py` script shipped
-  in the conversion container.
 - `device_map`: only when the installed stack requires it.
 - `trust_remote_code`: keep `true` only for trusted supported model repos.
 

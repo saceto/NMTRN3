@@ -104,12 +104,6 @@ When a backend already launches the step with `torchrun`, the existing distribut
 Default: `NEMOTRON_CONVERT_NPROC_PER_NODE` or `8`.
 ```
 
-```{option} script.path=<path>
-
-Path to Megatron-Bridge's `convert_checkpoints_multi_gpu.py`.
-Defaults to the path shipped in `nvcr.io/nvidia/nemo:26.04`: `/opt/Megatron-Bridge/examples/conversion/convert_checkpoints_multi_gpu.py`.
-```
-
 ## Command Examples
 
 Convert the default NVIDIA Nemotron base model into a local Megatron output directory:
