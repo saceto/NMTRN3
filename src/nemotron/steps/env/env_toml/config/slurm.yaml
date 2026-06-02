@@ -2,6 +2,8 @@
 #
 # This mirrors the Lepton example: one backend base plus concrete profiles
 # named for individual steps. Replace host/account/paths with site values.
+# Step configs remain the source of truth for image/recipe-specific requirements;
+# these profiles provide generic fallbacks plus cluster logistics.
 
 output_path: env.slurm.toml
 force: false
@@ -237,9 +239,10 @@ sections:
     env_vars:
       NEMOTRON_CURATOR_RAY_NUM_CPUS: "4"
 
-  # pretrain/megatron_bridge: child overrides scale/time and pretrain output path.
+  # pretrain/megatron_bridge: generic NeMo image fallback; tiny configs pin nano3.
   slurm_pretrain_megatron_bridge:
     extends: slurm_base
+    container_image: nvcr.io/nvidia/nemo:26.04
     nodes: 2
     ntasks_per_node: 8
     time: "04:00:00"
@@ -263,9 +266,10 @@ sections:
       WANDB_INIT_TIMEOUT: ${oc.env:WANDB_INIT_TIMEOUT,300}
       WANDB_HTTP_TIMEOUT: ${oc.env:WANDB_HTTP_TIMEOUT,300}
 
-  # sft/megatron_bridge: child overrides scale/time while inheriting site logistics.
+  # sft/megatron_bridge: generic NeMo image fallback; config owns recipe target/image.
   slurm_sft_megatron_bridge:
     extends: slurm_base
+    container_image: nvcr.io/nvidia/nemo:26.04
     nodes: 2
     ntasks_per_node: 8
     time: "04:00:00"
@@ -301,6 +305,7 @@ sections:
   # convert/*: one shared GPU profile for HF<->Megatron conversion and LoRA merge/export.
   slurm_convert_model:
     extends: slurm_base
+    container_image: nvcr.io/nvidia/nemo:26.04
     nodes: 1
     time: "02:00:00"
     env_vars:
@@ -334,7 +339,7 @@ sections:
   # optimize/modelopt/quantize: switch to the ModelOpt-capable NeMo image.
   slurm_optimize_modelopt_quantize:
     extends: slurm_base
-    container_image: nvcr.io/nvidia/nemo:26.02
+    container_image: nvcr.io/nvidia/nemo:26.04
     nodes: 2
     time: "04:00:00"
     env_vars:
@@ -349,7 +354,7 @@ sections:
   # optimize/modelopt/prune: pruning can run with fewer tasks than full-node train jobs.
   slurm_optimize_modelopt_prune:
     extends: slurm_base
-    container_image: nvcr.io/nvidia/nemo:26.02
+    container_image: nvcr.io/nvidia/nemo:26.04
     nodes: 1
     ntasks_per_node: 2
     gpus_per_node: 2

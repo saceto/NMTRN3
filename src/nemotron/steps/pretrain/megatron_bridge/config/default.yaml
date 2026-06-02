@@ -14,6 +14,10 @@
 
 # Megatron-Bridge pretrain / CPT defaults. Adapted from speaker/configs/cpt/megatron.
 
+run:
+  env:
+    container_image: nvcr.io/nvidia/nemo:26.04
+
 mode: cpt
 
 hf_model_path: nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16
@@ -51,10 +55,9 @@ scheduler:
 
 logger:
   log_interval: 10
-  wandb_project: ${oc.env:WANDB_PROJECT,null}
-  wandb_entity: ${oc.env:WANDB_ENTITY,null}
+  wandb_project: ${oc.select:run.wandb.project,${oc.env:WANDB_PROJECT,null}}
+  wandb_entity: ${oc.select:run.wandb.entity,${oc.env:WANDB_ENTITY,null}}
   wandb_exp_name: ${oc.env:WANDB_NAME,pretrain-megatron-bridge}
-
 checkpoint:
   save: /nemo_run/pretrain-model
   save_interval: 500

@@ -3,6 +3,8 @@
 # The intent is not to enumerate every resource shape. Keep one reusable
 # backend base, then add concrete profiles named after the steps they run.
 # Child profiles show how env profile files support `extends` and selective overrides.
+# Step configs remain the source of truth for image/recipe-specific requirements;
+# these profiles provide generic fallbacks plus cluster logistics.
 
 output_path: env.lepton.toml
 force: false
@@ -225,9 +227,10 @@ sections:
     env_vars:
       NEMOTRON_CURATOR_RAY_NUM_CPUS: "4"
 
-  # pretrain/megatron_bridge: same NeMo image as SFT, with pretrain output wiring.
+  # pretrain/megatron_bridge: generic NeMo image fallback; tiny configs pin nano3.
   lepton_pretrain_megatron_bridge:
     extends: lepton_base
+    container_image: nvcr.io/nvidia/nemo:26.04
     nodes: 2
     env_vars:
       PRETRAIN_OUTPUT_DIR: ${oc.env:PRETRAIN_OUTPUT_DIR,/mnt/lustre-shared/output/pretrain/megatron_bridge}
@@ -247,9 +250,10 @@ sections:
       WANDB_INIT_TIMEOUT: ${oc.env:WANDB_INIT_TIMEOUT,300}
       WANDB_HTTP_TIMEOUT: ${oc.env:WANDB_HTTP_TIMEOUT,300}
 
-  # sft/megatron_bridge: overrides only scale and output location.
+  # sft/megatron_bridge: generic NeMo image fallback; config owns recipe target/image.
   lepton_sft_megatron_bridge:
     extends: lepton_base
+    container_image: nvcr.io/nvidia/nemo:26.04
     nodes: 2
     env_vars:
       SFT_OUTPUT_DIR: ${oc.env:SFT_OUTPUT_DIR,/mnt/lustre-shared/output/sft/megatron_bridge}
@@ -283,6 +287,7 @@ sections:
   # convert/*: one shared GPU profile for HF<->Megatron conversion and LoRA merge/export.
   lepton_convert_model:
     extends: lepton_base
+    container_image: nvcr.io/nvidia/nemo:26.04
     nodes: 1
     env_vars:
       CONVERT_OUTPUT_DIR: ${oc.env:CONVERT_OUTPUT_DIR,/mnt/lustre-shared/output/convert}
@@ -314,7 +319,7 @@ sections:
   # optimize/modelopt/quantize: ModelOpt runs against the NeMo image where ModelOpt examples work.
   lepton_optimize_modelopt_quantize:
     extends: lepton_base
-    container_image: nvcr.io/nvidia/nemo:26.02
+    container_image: nvcr.io/nvidia/nemo:26.04
     nodes: 2
     env_vars:
       OPTIM_OUTPUT_DIR: /mnt/lustre-shared/output/optimize/quantize
@@ -328,7 +333,7 @@ sections:
   # optimize/modelopt/prune: pruning can run on a smaller 2-GPU shape.
   lepton_optimize_modelopt_prune:
     extends: lepton_base
-    container_image: nvcr.io/nvidia/nemo:26.02
+    container_image: nvcr.io/nvidia/nemo:26.04
     resource_shape: ${oc.env:LEPTON_PRUNE_GPU_SHAPE,gpu.2xa100-80gb}
     gpus_per_node: 2
     nprocs_per_node: 2
