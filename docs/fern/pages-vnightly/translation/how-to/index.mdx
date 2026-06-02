@@ -1,0 +1,91 @@
+---
+title: "How-To Guides"
+slug: "translation/how-to/index.html"
+description: "This section has task-focused procedures for changing backends, wiring fields, tuning segmentation, and adjusting FAITH."
+---
+
+This section has task-focused procedures for changing backends, wiring fields, tuning segmentation, and adjusting FAITH.
+
+For copy-paste prompts and habits when you work with a coding agent, read [Tips for Translation With Agents](/../using-skills) first.
+Start with [Getting Started With Translation](/../getting-started) if you have not run the step yet.
+
+Focused procedures for `nemotron steps run translate/nemo_curator`.
+
+## Run Translation
+
+<CardGroup cols={2}>
+<Card href="/run-llm-translation" icon="fa-regular fa-cpu" title="LLM backend">
+OpenAI-compatible servers, hosted or on-prem.
+
+---
+
+<Badge intent="info">backend=llm</Badge>
+
+</Card>
+
+<Card href="/run-nmt-translation" icon="fa-regular fa-server" title="NMT HTTP service">
+Self-hosted `POST /translate` microservices.
+
+---
+
+<Badge intent="info">backend=nmt</Badge>
+
+</Card>
+
+<Card href="/run-google-aws-translation" icon="fa-regular fa-cloud" title="Google or AWS">
+Managed cloud translation APIs.
+
+---
+
+<Badge intent="info">backend=google|aws</Badge>
+
+</Card>
+
+</CardGroup>
+
+## Configure and Tune
+
+<CardGroup cols={2}>
+<Card href="/configure-fields-and-output" icon="fa-regular fa-file-directory" title="Fields and outputs">
+Wildcards, `output_mode`, chat reconstruction.
+
+---
+
+<Badge intent="info">schema</Badge>
+
+</Card>
+
+<Card href="/use-fine-segmentation" icon="fa-regular fa-package" title="Segmentation">
+Switch `segmentation_mode` deliberately.
+
+---
+
+<Badge intent="info">segmentation</Badge>
+
+</Card>
+
+</CardGroup>
+
+## FAITH Quality Gates
+
+<CardGroup cols={2}>
+<Card href="/run-faith-evaluation" icon="fa-regular fa-checklist" title="FAITH evaluation">
+Thresholds, filtering, model overrides.
+
+---
+
+<Badge intent="info">faith</Badge>
+
+</Card>
+
+</CardGroup>
+
+```mermaid
+graph LR
+    A[Prepare YAML + env] --> B[nemotron steps run translate/nemo_curator]
+    B --> C{Need FAITH?}
+    C -->|yes| D[Tune faith_eval]
+    C -->|no| E[Disable faith_eval]
+    D --> B
+    E --> B
+```

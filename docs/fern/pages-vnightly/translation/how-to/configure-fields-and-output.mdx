@@ -1,0 +1,49 @@
+---
+title: "Configure Fields and Output"
+slug: "translation/how-to/configure-fields-and-output.html"
+description: "Use this guide when you need to align text_field, output_mode, reconstruction flags, and formats with your dataset schema before or after a first run."
+---
+
+Use this guide when you need to align `text_field`, `output_mode`, reconstruction flags, and formats with your dataset schema before or after a first run.
+
+For a guided first invocation, see [Getting Started With Translation](/../getting-started).
+
+## Choosing `text_field`
+
+- Chat corpora in OpenAI layout typically use `messages.*.content` so every message `content` entry is translated consistently.
+
+- Plain documents might use a single column such as `article_body`. Omit wildcards when the schema is flat.
+
+## Outputs
+
+| YAML key | Behavior |
+| --- | --- |
+| <code>output_field</code> / <code>translation_column</code> | Control column names used when emitting translated strings. The default is <code>translated_text</code>. |
+| <code>output_mode</code> | <code>replaced</code> overwrites source strings, <code>raw</code> preserves originals plus metadata, and <code>both</code> keeps audit trails. The starter default is <code>both</code>. |
+| <code>merge_scores</code> | Keeps FAITH outputs adjacent to translations when scoring runs. |
+| <code>reconstruct_messages</code>, <code>messages_field</code>, <code>messages_content_field</code> | Enable faithful reconstructions of chat arrays. These default to <code>true</code> for standard <code>messages</code> and <code>content</code> layouts. |
+
+## Formats
+
+Set `input_format` when automatic probing cannot distinguish ambiguous globs. Align `output_format` with downstream packing expectations; values are `jsonl` or `parquet`.
+
+## CLI Overrides
+
+You can override any YAML key with dotlists:
+
+```bash
+uv run nemotron steps run translate/nemo_curator -c default \
+  text_field=messages.*.content \
+  output_mode=both \
+  reconstruct_messages=true \
+  input_path=/path/to/chat.jsonl \
+  output_dir=/path/to/out \
+  source_language=en \
+  target_language=fr
+```
+
+## Related Pages
+
+- Schema patterns: [Input and Output Format](/../reference/io-format)
+
+- Segmentation interactions: [Use Fine Segmentation](/use-fine-segmentation)

@@ -1,0 +1,75 @@
+---
+title: "Synthetic Data How-To Guides"
+slug: "sdg/how-to/index.html"
+description: "This section provides task-focused guides for common SDG workflows. For your first run, start with Generate Your First Synthetic Dataset."
+---
+
+{/* SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License. */}
+
+<Anchor id="sdg-how-to-index"></Anchor>
+
+This section provides task-focused guides for common SDG workflows.
+For your first run, start with [Generate Your First Synthetic Dataset](/../getting-started).
+
+If you are new to model training or want a calmer on-ramp before tasks, read [Use the SDG Skill With Confidence](/../using-skills) for how to run a productive session with a coding agent.
+
+<CardGroup cols={2}>
+<Card href="/run" icon="fa-regular fa-play" title="Run the Pipeline">
+Preview, generate, and customize output path and projection.
+
+---
+
+<Badge intent="success">10 min</Badge> <Badge intent="info">intermediate</Badge>
+
+</Card>
+
+<Card href="/create-domain-dataset" icon="fa-regular fa-briefcase" title="Create a Domain Dataset">
+Adapt the pipeline to a custom domain with a seed file and multiple category dimensions.
+
+---
+
+<Badge intent="success">20 min</Badge> <Badge intent="info">intermediate</Badge>
+
+</Card>
+
+<Card href="/tool-call-data" icon="fa-regular fa-tools" title="Generate Tool-Call Data">
+Generate multi-turn conversations with OpenAI-style tool calls for tool-use SFT.
+
+---
+
+<Badge intent="success">15 min</Badge> <Badge intent="info">intermediate</Badge>
+
+</Card>
+
+<Card href="/preference-data" icon="fa-regular fa-git-compare" title="Generate Preference Data">
+Generate DPO preference pairs (prompt / chosen / rejected) from `rl_pref.yaml`.
+
+---
+
+<Badge intent="success">15 min</Badge> <Badge intent="info">intermediate</Badge>
+
+</Card>
+
+<Card href="/dispatch-to-cluster" icon="fa-regular fa-server" title="Dispatch to a Cluster">
+Configure an env.toml profile and run SDG on Lepton or Slurm.
+
+---
+
+<Badge intent="success">30 min</Badge> <Badge intent="info">intermediate</Badge>
+
+</Card>
+
+</CardGroup>

@@ -1,0 +1,76 @@
+---
+title: "Reference"
+slug: "build-benchmarks/reference/index.html"
+description: "Specifications grounded in src/nemotron/steps/byob."
+---
+
+{/* SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  SPDX-License-Identifier: Apache-2.0 */}
+
+Specifications grounded in `src/nemotron/steps/byob`.
+
+## Outputs
+
+<CardGroup cols={2}>
+<Card href="/output-files" icon="fa-regular fa-file-code" title="Output files">
+Seed, stage cache, raw and final Parquet paths.
+
+---
+
+<Badge intent="info">parquet</Badge>
+
+</Card>
+
+<Card href="/troubleshooting" icon="fa-regular fa-alert" title="Troubleshooting">
+Common configuration errors, missing caches, filtering, and endpoint issues.
+
+---
+
+<Badge intent="info">faq</Badge>
+
+</Card>
+
+</CardGroup>
+
+## Configuration
+
+<CardGroup cols={2}>
+<Card href="/generate-config" icon="fa-regular fa-gear" title="Generation YAML">
+Required keys for `ByobConfig.from_yaml`.
+
+---
+
+<Badge intent="info">yaml</Badge>
+
+</Card>
+
+<Card href="/translation-config" icon="fa-regular fa-globe" title="Translation YAML">
+`ByobTranslationConfig.from_yaml` requirements.
+
+---
+
+<Badge intent="info">yaml</Badge>
+
+</Card>
+
+</CardGroup>
+
+## Source benchmarks
+
+<CardGroup cols={2}>
+<Card href="/benchmarks" icon="fa-regular fa-database" title="Allowed Hugging Face datasets">
+Identifiers and default subsets from `runtime/constants.py`.
+
+---
+
+<Badge intent="info">hf_dataset</Badge>
+
+</Card>
+
+</CardGroup>
+
+## Related documentation
+
+- Tutorial: [Getting Started with Building MCQ Benchmarks](/../getting-started)
+
+- Concepts: [Concepts](/../explanation/index)

@@ -1,0 +1,27 @@
+---
+title: "Curation Troubleshooting"
+slug: "curate/reference/troubleshooting.html"
+description: "Symptom"
+---
+
+| Symptom | Likely Cause | Fix |
+| --- | --- | --- |
+| <code>input_glob</code> matches no files | Path does not exist in the current host, container, or shared mount | Use an absolute path or verify the mount. For local tiny runs, override the packaged <code>/nemo_run/code/...</code> path with <code>$&#123;PWD&#125;/src/nemotron/steps/curate/nemo_curator/data/tiny.jsonl</code>. |
+| Missing FastText model | <code>language_codes</code> is non-empty but <code>models.fasttext_langid</code> is missing or invalid | Set <code>language_codes=[]</code> to disable language filtering, or provide the FastText <code>lid.176.bin</code> path. |
+| <code>quality_filters</code> error about <code>min_words</code> and <code>max_words</code> | Only one word-count bound was set | Set both <code>quality_filters.min_words</code> and <code>quality_filters.max_words</code>, or set <code>quality_filters=&#123;&#125;</code>. |
+| Output is empty or much smaller than expected | Filters are too strict or applied before corpus shape is understood | Re-run with <code>language_codes=[]</code>, <code>domains=[]</code>, and <code>quality_filters=&#123;&#125;</code>. Add filters back one at a time. |
+| Ray worker starts a new <code>.venv</code> or cannot import dependencies | Local <code>uv run</code> and the Ray runtime environment are both attempting to manage dependency setup | Export <code>RAY_ENABLE_UV_RUN_RUNTIME_ENV=0</code> and run with <code>uv run --no-sync</code> after <code>uv sync --extra curate</code>. |
+| Large local file causes memory pressure | Input shard is too large for the available Ray worker memory | Split large JSONL files into smaller shards before running Curator. |
+| Domain classifier downloads repeatedly | Hugging Face cache path is not persistent | Set <code>models.hf_cache_dir</code> to a persistent cache location and mount it in remote profiles. |
+
+## Debug Checklist
+
+1. Run the local tiny command with filters disabled.
+
+2. Confirm `uv sync --extra curate` completed in the same repository clone.
+
+3. Confirm the input path exists where the command runs.
+
+4. Confirm `output_dir` is writable.
+
+5. Add language, word-count, and domain filters one at a time.

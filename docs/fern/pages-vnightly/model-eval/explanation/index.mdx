@@ -1,0 +1,45 @@
+---
+title: "Concepts"
+slug: "model-eval/explanation/index.html"
+description: "The pages in this section cover the design rules behind eval/model_eval. Read them when you want to understand why the how-to pages take the actions they do, before you change a configuration default "
+---
+
+The pages in this section cover the design rules behind `eval/model_eval`.
+Read them when you want to understand why the how-to pages take the actions they do, before you change a configuration default or adapt a recipe to a new deployment.
+
+## Pipeline And Architecture
+
+<CardGroup cols={2}>
+<Card href="/pipeline-overview" icon="fa-regular fa-graph" title="Pipeline Overview">
+Artifact flow from a checkpoint or hosted endpoint, through `eval/model_eval`, into `eval_results` on disk.
+
+---
+
+<Badge intent="info">architecture</Badge>
+
+</Card>
+
+</CardGroup>
+
+## Deployment Contract
+
+<CardGroup cols={2}>
+<Card href="/endpoint-types-and-benchmarks" icon="fa-regular fa-plug" title="Endpoint Types And Benchmark Families">
+Chat versus completions endpoints, and which benchmark families match each one.
+
+---
+
+<Badge intent="info">endpoint</Badge>
+
+</Card>
+
+<Card href="/tokenizer-alignment" icon="fa-regular fa-package" title="Tokenizer Alignment">
+Why log-probability benchmarks need a tokenizer that matches the served model.
+
+---
+
+<Badge intent="info">tokenizer</Badge>
+
+</Card>
+
+</CardGroup>

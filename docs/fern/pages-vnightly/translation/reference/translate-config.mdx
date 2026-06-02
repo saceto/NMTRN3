@@ -1,0 +1,159 @@
+---
+title: "Translation YAML Reference"
+slug: "translation/reference/translate-config.html"
+description: "The translate/nemo_curator step ships src/nemotron/steps/translate/nemo_curator/config/default.yaml as the canonical starter profile. This page lists top-level keys you can override with nemotron step"
+---
+
+The `translate/nemo_curator` step ships `src/nemotron/steps/translate/nemo_curator/config/default.yaml` as the canonical starter profile. This page lists top-level keys you can override with `nemotron steps run translate/nemo_curator key=value` dotlists, grouped by concern, with the full baseline file inlined below.
+
+## Default Configuration File
+
+```yaml startLine={1}
+# Starter config for NeMo Curator corpus translation.
+
+run:
+  env:
+    mounts:
+      - ${auto_mount:git+https://github.com/NVIDIA-NeMo/Curator.git@d10cd6ffe9f5ac4cbb176d7b3ada698f22633aea,/opt/Curator}
+
+input_path: /path/to/filtered_data.jsonl
+output_dir: ./output/translated
+
+# Required. Ask the user; do not infer silently.
+source_language: ???
+target_language: ???
+
+input_format: auto        # auto | jsonl | parquet
+output_format: jsonl      # jsonl | parquet
+backend: llm              # llm | nmt | google | aws
+
+text_field: messages.*.content
+output_field: translated_text
+translation_column: translated_text
+output_mode: both         # replaced | raw | both
+merge_scores: true
+reconstruct_messages: true
+messages_field: messages
+messages_content_field: content
+
+segmentation_mode: coarse # coarse | fine
+min_segment_chars: 0
+max_concurrent_requests: 64
+generation_config: null   # Optional OpenAI-compatible translation generation settings.
+skip_translated: false
+files_per_partition: null
+blocksize: null
+
+server:
+  url: https://integrate.api.nvidia.com/v1
+  model: ""              # Required for backend=llm and used by FAITH unless faith_eval.model_name is set.
+  api_key_env: NVIDIA_API_KEY
+  api_key: ""
+
+faith_eval:
+  enabled: true
+  threshold: 2.5
+  model_name: ""
+  filter_enabled: true
+  max_concurrent_requests: 64
+  generation_config:
+    max_tokens: 2048
+    temperature: 0.0
+
+nmt:
+  server_url: http://localhost:5000
+  batch_size: 32
+  timeout: 120
+  max_concurrent_requests: 32
+
+google:
+  project_id: ""
+  location: global
+  api_version: v2
+  max_concurrent_requests: 32
+
+aws:
+  region: us-east-2
+  max_concurrent_requests: 32
+```
+
+## Keys Grouped by Concern
+
+### Paths and Formats
+
+| Key | Description |
+| --- | --- |
+| <code>input_path</code> | File, glob, or homogeneous directory consumed by <code>JsonlReader</code> or <code>ParquetReader</code>. |
+| <code>output_dir</code> | Directory passed to <code>JsonlWriter</code> or <code>ParquetWriter</code> in overwrite mode. |
+| <code>input_format</code> | <code>auto</code>, <code>jsonl</code>, or <code>parquet</code>. |
+| <code>output_format</code> | <code>jsonl</code> or <code>parquet</code>. |
+
+### Languages and Backend
+
+| Key | Description |
+| --- | --- |
+| <code>source_language</code> / <code>target_language</code> | Required ISO 639-1 codes. Empty placeholders remind operators to set values explicitly. |
+| <code>backend</code> | <code>llm</code>, <code>nmt</code>, <code>google</code>, or <code>aws</code>. |
+
+### Translation Semantics
+
+| Key | Description |
+| --- | --- |
+| <code>text_field</code> | Dot or wildcard path describing strings to translate. The default is <code>messages.*.content</code>. |
+| <code>output_field</code>, <code>translation_column</code> | Destination columns for translated text and downstream merges. |
+| <code>output_mode</code> | <code>replaced</code>, <code>raw</code>, or <code>both</code>. |
+| <code>merge_scores</code> | Attach FAITH outputs adjacent to translations when enabled. |
+| <code>reconstruct_messages</code>, <code>messages_field</code>, <code>messages_content_field</code> | Chat reconstruction switches. |
+| <code>segmentation_mode</code>, <code>min_segment_chars</code> | Segmenter behavior. Values include <code>coarse</code> and <code>fine</code>. |
+| <code>max_concurrent_requests</code>, <code>skip_translated</code>, <code>files_per_partition</code>, <code>blocksize</code> | Throughput and partitioning controls surfaced to Curator readers and clients. |
+
+### LLM Fields
+
+Used whenever `backend=llm` or FAITH needs an OpenAI-compatible judge.
+
+| Key | Description |
+| --- | --- |
+| <code>server.url</code> | Chat-completions compatible base URL. |
+| <code>server.model</code> | Model identifier. Required for <code>llm</code> translation and for FAITH unless you override the scorer model. |
+| <code>server.api_key_env</code> | Environment variable housing the API secret. The default is <code>NVIDIA_API_KEY</code>. |
+| <code>server.api_key</code> | Inline secret. Discouraged for shared repositories. |
+
+### FAITH Evaluation
+
+| Key | Description |
+| --- | --- |
+| <code>enabled</code> | Turns FAITH scoring on. The starter YAML sets this to <code>true</code>. |
+| <code>threshold</code> | Minimum acceptable <code>faith_avg</code> on a one-to-five scale. The starter default <code>2.5</code> is a permissive noisy-data floor. See [FAITH Evaluation Inside Translation](/../explanation/faith-evaluation) for the full rubric. |
+| <code>model_name</code> | Optional scorer-only model. Defaults to <code>server.model</code>. |
+| <code>filter_enabled</code> | Drop failing rows when <code>true</code>. |
+| <code>max_concurrent_requests</code> | Optional scorer-side concurrency limit. |
+| <code>generation_config</code> | Optional OpenAI-compatible generation settings for the scorer. |
+
+### Backend-Specific Blocks
+
+| Block | When needed |
+| --- | --- |
+| <code>nmt</code> | HTTP microservice URL, batching, timeouts. |
+| <code>google</code> | Project metadata and API version. Version <code>v3</code> requires <code>project_id</code>. |
+| <code>aws</code> | Region plus concurrency limits. |
+
+## Overrides
+
+OmegaConf dotlists merge last:
+
+```bash
+uv run nemotron steps run translate/nemo_curator -c default \
+  backend=nmt \
+  nmt.server_url=http://localhost:5000 \
+  faith_eval.enabled=false \
+  input_path=/data/chat.jsonl \
+  output_dir=/data/out \
+  source_language=en \
+  target_language=hi
+```
+
+## Related Pages
+
+- CLI merge rules and flags: [CLI Reference for Translation](/cli-translation)
+
+- Record shapes and writers: [Input and Output Format](/io-format)
