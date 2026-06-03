@@ -1,5 +1,5 @@
 ## Description: <br>
-Generates BYO custom safety policies for NVIDIA Nemotron content-safety guardrails — Nemotron-Content-Safety-Reasoning-4B (text) and multimodal Nemotron-3-Content-Safety. <br>
+Generates BYO custom safety policies for NVIDIA Nemotron content-safety guardrails — Nemotron-Content-Safety-Reasoning-4B (text) and multimodal Nemotron-3-Content-Safety — producing a Markdown policy, JSON taxonomy, and drop-in inference prompts. <br>
 
 This skill is ready for commercial/non-commercial use. <br>
 
@@ -9,7 +9,7 @@ NVIDIA <br>
 ### License/Terms of Use: <br>
 Apache-2.0 AND CC-BY-4.0 <br>
 ## Use Case: <br>
-Developers and safety engineers generating custom content-safety policies, JSON taxonomies, and inference prompts for NVIDIA Nemotron guardrail models. <br>
+Developers and safety engineers creating custom content-safety policies for NVIDIA Nemotron guardrail models, mapping rough requirements into structured policy artifacts compatible with Nemotron-Content-Safety-Reasoning-4B and Nemotron-3-Content-Safety. <br>
 
 ### Deployment Geography for Use: <br>
 Global <br>
@@ -19,17 +19,16 @@ Risk: Review before execution as proposals could introduce incorrect or misleadi
 Mitigation: Review and scan skill before deployment. <br>
 
 ## Reference(s): <br>
-- [Content Safety Taxonomy (V2)](references/content_safety_taxonomy.md) <br>
+- [Content Safety V2 Taxonomy](references/content_safety_taxonomy.md) <br>
 - [Policy Patterns](references/policy_patterns.md) <br>
 - [Target Models](references/target_models.md) <br>
-- [Nemotron Developer Repository](https://nvidia-nemo.github.io/Nemotron/dev/) <br>
 
 
 ## Skill Output: <br>
 **Output Type(s):** [Files, Configuration instructions] <br>
-**Output Format:** [Markdown policy, JSON taxonomy, and plain-text system prompts] <br>
+**Output Format:** [Markdown, JSON, and plain-text system prompts] <br>
 **Output Parameters:** [1D] <br>
-**Other Properties Related to Output:** [Outputs validated against assets/policy_json_schema.json] <br>
+**Other Properties Related to Output:** [None] <br>
 
 ## Evaluation Agents Used: <br>
 - Claude Code (`claude-code`) <br>
@@ -38,7 +37,7 @@ Mitigation: Review and scan skill before deployment. <br>
 
 
 ## Evaluation Tasks: <br>
-Evaluated against 11 NVSkills-Eval tasks (6 positive, 5 negative) with 2 attempts per task and a 50% pass threshold. <br>
+Evaluated against 11 tasks (6 positive activation, 5 negative activation) via NVSkills-Eval external profile with 2 attempts per task and a 50% pass threshold. <br>
 
 ## Evaluation Metrics Used: <br>
 Reported benchmark dimensions: <br>
@@ -62,19 +61,14 @@ Underlying evaluation signals used in this run: <br>
 ## Evaluation Results: <br>
 | Dimension | Num | `claude-code` | `codex` |
 |---|---:|---:|---:|
-| Security | 8 | 95% (+20%) | 98% (+16%) |
-| Correctness | 8 | 89% (-0%) | 79% (+10%) |
-| Discoverability | 8 | 90% (+11%) | 77% (+2%) |
-| Effectiveness | 8 | 82% (+1%) | 68% (+14%) |
-| Efficiency | 8 | 75% (+14%) | 68% (+4%) |
-
-## Testing Completed: <br>
-**[x] Agent Red-Teaming** <br>
-**[ ] Network Security** <br>
-**[ ] Product Security** <br>
+| Security | 8 | 100% (+15%) | 100% (+9%) |
+| Correctness | 8 | 88% (-4%) | 77% (+10%) |
+| Discoverability | 8 | 92% (+6%) | 79% (+3%) |
+| Effectiveness | 8 | 80% (+2%) | 64% (+19%) |
+| Efficiency | 8 | 76% (+8%) | 71% (+3%) |
 
 ## Skill Version(s): <br>
-0.1.0 (source: pyproject.toml) <br>
+0.1.0 (source: frontmatter, pyproject.toml) <br>
 
 ## Ethical Considerations: <br>
 NVIDIA believes Trustworthy AI is a shared responsibility and we have established policies and practices to enable development for a wide array of AI applications. When downloaded or used in accordance with our terms of service, developers should work with their internal team to ensure this skill meets requirements for the relevant industry and use case and addresses unforeseen product misuse. <br>

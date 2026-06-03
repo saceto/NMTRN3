@@ -13,7 +13,7 @@ This benchmark summarizes 3-Tier Evaluation from NVSkills-Eval results for the s
 - Dataset: 11 evaluation tasks
 - Attempts per task: 2
 - Pass threshold: 50%
-- Overall verdict: FAIL
+- Overall verdict: PASS
 
 ## Agents Used
 
@@ -54,17 +54,17 @@ Task composition is derived from the evaluation dataset when possible. Entries w
 
 | Dimension | Num | `claude-code` | `codex` |
 |---|---:|---:|---:|
-| Security | 8 | 95% (+20%) | 98% (+16%) |
-| Correctness | 8 | 89% (-0%) | 79% (+10%) |
-| Discoverability | 8 | 90% (+11%) | 77% (+2%) |
-| Effectiveness | 8 | 82% (+1%) | 68% (+14%) |
-| Efficiency | 8 | 75% (+14%) | 68% (+4%) |
+| Security | 8 | 100% (+15%) | 100% (+9%) |
+| Correctness | 8 | 88% (-4%) | 77% (+10%) |
+| Discoverability | 8 | 92% (+6%) | 79% (+3%) |
+| Effectiveness | 8 | 80% (+2%) | 64% (+19%) |
+| Efficiency | 8 | 76% (+8%) | 71% (+3%) |
 
 Score values show skill-assisted performance. Values in parentheses show uplift versus the no-skill baseline when baseline data is available.
 
 ## Tier 1: Static Validation Summary
 
-Tier 1 validation passed with observations. NVSkills-Eval ran 9 checks and found 8 total findings.
+Tier 1 validation passed with observations. NVSkills-Eval ran 9 checks and found 7 total findings.
 
 Top findings:
 
@@ -76,14 +76,13 @@ Top findings:
 
 ## Tier 2: Deduplication Summary
 
-Tier 2 validation reported findings. NVSkills-Eval ran 2 checks and found 1 total findings.
+Tier 2 validation passed. NVSkills-Eval ran 2 checks and found 0 total findings.
 
-Top findings:
+Notable observations:
 
-- HIGH DUPLICATE/duplicate: Duplicate content found across references/content_safety_taxonomy.md and references/target_models.md:
-  "## How severity maps to model output" in references/content_safety_taxonomy.md (lines 162-169)
-  vs "## Severity (runtime concept, not model output)" in references/target_models.md (lines 51-53) (`references/content_safety_taxonomy.md:162`)
+- Context Deduplication: Collected 5 file(s)
+- Inter-Skill Deduplication: Parsed skill 'nemotron-policy-generator': 352 char description
 
 ## Publication Recommendation
 
-The skill should be reviewed before NVSkills-Eval publication. Skill owners should address the findings above and rerun NVSkills-Eval to refresh this benchmark.
+The skill is suitable to proceed toward NVSkills-Eval publication based on this benchmark. Skill owners should keep this file with the skill and refresh it when the evaluation dataset, skill behavior, or target agents materially change.
