@@ -186,9 +186,9 @@
     <input type="text" id="jurisdiction" placeholder="e.g., US (EN-US); EU and India carve-outs noted">
 
     <h2>3. Categories</h2>
-    <div class="helper">Toggle Aegis canonical categories; add custom categories below.</div>
+    <div class="helper">Toggle V2 canonical categories; add custom categories below.</div>
 
-    <h3>Aegis canonical</h3>
+    <h3>V2 canonical</h3>
     <div class="checkbox-grid" id="aegisChecks"></div>
 
     <h3>Custom categories</h3>
@@ -573,7 +573,7 @@ function buildPolicyObject() {
       `Deployment archetype: ${document.getElementById('archetype').selectedOptions[0].text}`,
       `Severity model: ${val('severityModel')}`,
       `Target model(s): ${getTargetModel()}`,
-      `Taxonomy mapping: ${canonicalCount} Aegis canonical, ${customCount} custom`
+      `Taxonomy mapping: ${canonicalCount} V2 canonical, ${customCount} custom`
     ],
     allow_list: splitLines(val('allowList')),
     response_guidance: {
