@@ -71,4 +71,7 @@ checkpoint:
   fully_parallel_save: false
   save_optim: false
   save_rng: false
-  pretrained_checkpoint: ${oc.env:MEGATRON_PRETRAINED_CHECKPOINT,./output/sft/megatron_bridge/tiny/sft-tiny-2node}
+  # Required Megatron checkpoint to freeze and adapt (any base/instruct/SFT'd model or a
+  # convert/hf_to_megatron result; PEFT cannot load directly from HF). Set
+  # MEGATRON_PRETRAIN_PATH, or pass checkpoint.pretrained_checkpoint=/path on the CLI.
+  pretrained_checkpoint: ${oc.env:MEGATRON_PRETRAIN_PATH,null}

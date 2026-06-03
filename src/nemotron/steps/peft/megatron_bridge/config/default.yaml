@@ -18,6 +18,14 @@ run:
   env:
     container_image: nvcr.io/nvidia/nemo:26.04
 
+# The LoRA adapters train on top of a frozen model loaded from a Megatron checkpoint
+# (checkpoint.pretrained_checkpoint below); adapters save separately to checkpoint.save.
+# Any Megatron checkpoint works — a base, instruct, or your own SFT'd model — it just
+# becomes the frozen weights the adapters sit on. PEFT cannot load this directly from
+# HF: Megatron-Bridge's PEFT hook reads a checkpoint on disk and errors if it is
+# missing. To start from an HF model, first convert it to a Megatron checkpoint (run an
+# SFT step or convert/hf_to_megatron), then point at it via MEGATRON_PRETRAIN_PATH (or
+# the CLI override below).
 recipe:
   _target_: megatron.bridge.recipes.nemotronh.nemotron_3_nano.nemotron_3_nano_peft_config
   packed_sequence: true
@@ -50,8 +58,10 @@ peft:
     - linear_qkv
     - linear_proj
 
-# PEFT validation in Megatron-Bridge requires checkpoint.pretrained_checkpoint
-# to remain populated even when AutoBridge loads HF weights into the provider.
+# inherit_save_as_load:false keeps checkpoint.load unset so the frozen base is read
+# from pretrained_checkpoint (not the empty adapter save dir) — set load explicitly to
+# resume an adapter run. clear_pretrained_checkpoint:false is a no-op here (kept for
+# clarity) since PEFT never takes the HF path that would clear it.
 hf_load:
   clear_pretrained_checkpoint: false
   inherit_save_as_load: false
@@ -69,9 +79,28 @@ logger:
   wandb_entity: ${oc.select:run.wandb.entity,${oc.env:WANDB_ENTITY,null}}
   wandb_exp_name: ${oc.env:WANDB_NAME,peft-megatron-bridge}
 checkpoint:
+  # Where adapter checkpoints are written.
   save: /nemo_run/peft-model
+
+  # Required: an existing Megatron checkpoint to freeze and adapt — a base, instruct,
+  # or SFT'd model, or a convert/hf_to_megatron result. Set MEGATRON_PRETRAIN_PATH, or
+  # pass it on the CLI: checkpoint.pretrained_checkpoint=/path/to/megatron-checkpoint
+  # The runner fails fast if it is unset or not a real checkpoint.
+  pretrained_checkpoint: ${oc.env:MEGATRON_PRETRAIN_PATH,null}
+
+  # Resume an interrupted adapter run: point `load` at the adapter save directory.
+  # Unlike SFT/pretrain it does NOT default to `save` (hf_load.inherit_save_as_load
+  # is false, so the frozen base still comes from pretrained_checkpoint).
+  # Megatron-Bridge reads the tracker file there, finds the latest iteration, and
+  # loads its `iter_<N>/` adapter checkpoint. Uncomment to resume:
+  # load: /nemo_run/peft-model
+
+  # By default the latest adapter iteration is loaded. To resume from a specific one,
+  # set ckpt_step to N (applies to the adapter checkpoint, not the frozen base).
+  # Uncomment to use:
+  # ckpt_step: 100
+
   save_interval: 50
-  pretrained_checkpoint: ${oc.env:NEMOTRON_PRETRAINED_CKPT}
   finetune: true
   # PEFT saves adapter-filtered checkpoint sections. The fully-parallel
   # distributed checkpoint writer is fragile for that sparse adapter-only state,
