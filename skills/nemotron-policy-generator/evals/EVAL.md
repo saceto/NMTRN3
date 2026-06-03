@@ -7,32 +7,15 @@ SPDX-License-Identifier: CC-BY-4.0
 
 How to run the eval set for this skill, what it measures, and how to interpret the result.
 
-## Quick run
+## How to run it
 
-```bash
-# From the repo root
-nv-aces run \
-  --skill skills/nemotron-policy-generator \
-  --dataset skills/nemotron-policy-generator/evals/evals.json \
-  --harness claude-code \
-  --model sonnet \
-  --baseline without-skill \
-  --output BENCHMARK.md
-```
+Run the cases in `evals.json` through an agent-skill evaluation harness that executes each case twice — once **with the skill installed** and once **without** (the baseline) — for every supported agent harness (Claude Code and Codex), then compares the two and writes the result to `BENCHMARK.md`.
 
-Run it twice, once for each agent harness the catalog supports (Claude Code and Codex), per the publishing guide:
-
-```bash
-nv-aces run --skill skills/nemotron-policy-generator \
-  --dataset skills/nemotron-policy-generator/evals/evals.json \
-  --harness codex --model gpt-5 --baseline without-skill --output BENCHMARK.md
-```
-
-`nv-aces` ships five evaluators out of the box: `skill_execution`, `skill_efficiency`, `accuracy`, `goal_accuracy`, `behavior_check`. NV-BASE rolls these up into the five human-readable NVIDIA evaluation dimensions: Security, Correctness, Discoverability, Effectiveness, Efficiency.
+The evaluation measures five per-case signals — `skill_execution`, `skill_efficiency`, `accuracy`, `goal_accuracy`, `behavior_check` — rolled up into the five NVIDIA evaluation dimensions: Security, Correctness, Discoverability, Effectiveness, Efficiency.
 
 ## What this eval set measures
 
-The `cases` array in `evals.json` mixes positive cases (where the agent should trigger this skill and produce a policy artifact), negative cases (where it should stay silent), and red-team / adversarial cases (where it triggers but must hold a safety line, or must resist a trigger-boundary trap). The split exists because trigger accuracy under distractor load is the hard problem — selection accuracy degrades sharply when many skills are installed, per Liu et al. (arXiv 2604.04323) cited in the publishing guide.
+The `cases` array in `evals.json` mixes positive cases (where the agent should trigger this skill and produce a policy artifact), negative cases (where it should stay silent), and red-team / adversarial cases (where it triggers but must hold a safety line, or must resist a trigger-boundary trap). The split exists because trigger accuracy under distractor load is the hard problem — selection accuracy degrades sharply when many skills are installed (Liu et al., arXiv 2604.04323).
 
 Positive cases exercise:
 

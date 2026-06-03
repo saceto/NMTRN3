@@ -50,4 +50,4 @@ The generated policy is **emit-mode-aware**: the JSON taxonomy records every cat
 
 ## Severity (runtime concept, not model output)
 
-Neither model emits severity directly. Both emit a binary harmful/unsafe verdict (plus a category label or list). The skill's S0–S4 severity bands are a **runtime guardrail concept** — `NeMo Guardrails` (or any wrapper) consults severity to decide enforcement action (pass / caveat / refuse / refuse+redirect / refuse+log). Severity stays in the JSON taxonomy as per-category metadata.
+Neither model emits severity directly; both return only a binary harmful/unsafe verdict plus a category label or list. For how the skill's S0–S4 bands are recorded and consumed at runtime, see [How severity maps to model output](content_safety_taxonomy.md#how-severity-maps-to-model-output).

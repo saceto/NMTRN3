@@ -1,10 +1,12 @@
 ---
 name: "nemotron-policy-generator"
 title: "Nemotron Policy Generator"
+version: "0.1.0"
 description: "Generates BYO custom safety policies for NVIDIA Nemotron content-safety guardrails — Nemotron-Content-Safety-Reasoning-4B (text) and multimodal Nemotron-3-Content-Safety. Produces a Markdown policy, JSON taxonomy, and drop-in inference prompts. Maps rough words or an existing policy to V2 categories, adding custom categories or topic-following rules."
 license: "Apache-2.0 AND CC-BY-4.0"
 compatibility: "nvidia/Nemotron-Content-Safety-Reasoning-4B (text, EN, /think) · nvidia/Nemotron-3-Content-Safety (multimodal, 12 langs, BYO + /think) · Gemma-3-4B-it · vLLM / SGLang / TRTLLM / Transformers · NeMo Guardrails"
 metadata:
+  version: "0.1.0"
   author: "Shyamala Prayaga <sprayaga@nvidia.com>"
   team: "Nemotron Safety PM"
   tags:

@@ -164,7 +164,7 @@ Custom categories continue Sn numbering from S23 onward.
 The model itself emits **binary** `Prompt harm: harmful/unharmful` + `Response harm: harmful/unharmful`, optionally preceded by a `<think>…</think>` trace in reasoning-on mode. The S0–S4 severity bands listed above are a **runtime guardrail concept**, not a model output:
 
 - The skill's JSON output records `severity: Sn` per category.
-- The runtime layer (e.g., NeMo Guardrails) maps `(category, model harmful=true) → enforcement action` via the severity band.
+- The runtime layer (e.g., NeMo Guardrails) maps `(category, model harmful=true) → enforcement action` via the severity band (pass / caveat / refuse / refuse+redirect / refuse+log).
 - The skill must keep severity as a per-category metadata field even though the model doesn't emit it directly.
 
 ## Quick auto-detect heuristic
