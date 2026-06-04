@@ -39,6 +39,10 @@ currency: "frozen"
 - What is the MOPD algorithm: objective, async on-policy distillation, dense token-level guidance, merging teachers?
 - What are the MOPD training settings (gen length, batch, rollouts)?
 
+# Post-training pipeline (Figure 9)
+
+![Nemotron 3 Ultra post-training pipeline: Base → SFT → RLVR → MOPD warmup → MOPD (×N cycles) → MTP boosting → Nemotron 3 Ultra.](../../../../docs/assets/ultra3/figure-9.png)
+
 # RLVR stage (3.2)
 
 Claim: RLVR ("Reinforcement Learning with Verifiable Reward") is a single unified stage across all environments, run on top of the SFT model to produce the student.

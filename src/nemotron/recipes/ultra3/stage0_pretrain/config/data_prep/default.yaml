@@ -1,6 +1,6 @@
 run:
   env:
-    container: anyscale/ray:2.49.2-py312
+    container: anyscale/ray:2.55.1-py312
 
 # Default Ultra3 pretrain config — Phase 1 (diversity, ~15T of the 20T horizon).
 # Two-phase curriculum:

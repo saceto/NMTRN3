@@ -1,6 +1,8 @@
 # Nemotron 3 Ultra Training Recipe
 
-Pretraining and OpenMath SFT support for Nemotron 3 Ultra through the Nemotron CLI and runspec/NeMo-Run.
+Pretraining and packed SFT support for Nemotron 3 Ultra through the Nemotron CLI and runspec/NeMo-Run.
+
+![Nemotron 3 Ultra layer pattern: a hybrid Mamba-2 + Attention architecture scaled sparsely with LatentMoE layers (550B total / 55B active).](../../assets/ultra3/figure-2.png)
 
 ## Quick start
 
@@ -8,8 +10,8 @@ Pretraining and OpenMath SFT support for Nemotron 3 Ultra through the Nemotron C
 
 - Slurm execution profile in `env.toml` (see [Execution through NeMo-Run](../../nemo_runspec/nemo-run.md))
 - A Ray-capable profile for `data prep` (tokenizes the open pretrain/SFT mixture)
-- SFT: Megatron-Bridge handles OpenMathInstruct-2 download/packing
-- Container image: `nvcr.io/nvidia/nemo:26.04.01`
+- SFT: the default config consumes an externally packed Ultra3 SFT data artifact; `openmath` remains the Megatron-Bridge OpenMathInstruct-2 fallback/demo config
+- Training container images: build stage squashfs images from `nvcr.io/nvidia/nemo:26.04.01` with `nemotron kit slurm build`
 - Hugging Face model id/path: `nvidia/nemotron-ultra-rl-052726`
 
 Example `env.toml` profile:
@@ -37,9 +39,13 @@ uv run nemotron ultra3 sft -c tiny --run YOUR-CLUSTER --dry-run
 | Stage | Purpose | Guide |
 |-------|---------|-------|
 | 0 | [Pretraining](./pretrain.md) | Data prep + pretraining with Megatron-Bridge |
-| 1 | [SFT](./sft.md) | OpenMathInstruct-2 packed SFT with Megatron-Bridge |
+| 1 | [SFT](./sft.md) | Paper-style packed-Parquet SFT by default; OpenMathInstruct-2 fallback with Megatron-Bridge |
 | 2 | [MOPD](./mopd.md) | RLVR + teacher panel + Multi-Teacher On-Policy Distillation with NeMo RL (GB200) |
 | 3 | [Quantization](./quantization.md) | NVFP4 post-training quantization for Blackwell |
+
+The post-training pipeline is **Base → SFT → RLVR → MOPD warmup → MOPD (×N cycles) → MTP boosting**:
+
+![Nemotron 3 Ultra post-training pipeline: Base → SFT → RLVR → MOPD warmup → MOPD (xN cycles) → MTP boosting → Nemotron 3 Ultra.](../../assets/ultra3/figure-9.png)
 
 ## RL post-training is not fully replicated
 

@@ -13,12 +13,14 @@ megatron.bridge.recipes.nemotronh.nemotron_3_ultra.nemotron_3_ultra_pretrain_con
 | CLI command | `nemotron ultra3 pretrain` |
 | Runspec name | `ultra3/pretrain` |
 | Launch | `torchrun` |
-| Container | `nvcr.io/nvidia/nemo:26.04.01` |
+| Container | `~/.cache/nemotron/containers/ultra3-pretrain.sqsh` (built from `nvcr.io/nvidia/nemo:26.04.01`) |
 | HF model id | `nvidia/nemotron-ultra-rl-052726` |
-| Default resources | 48 nodes × 8 GPUs |
+| Default resources | 96 nodes × 8 GPUs |
 | Default parallelism | TP=2, PP=12, EP=32, ETP=1, CP=1 |
 
 ## Data
+
+![Nemotron 3 Ultra pretraining data mixtures. Phase 1 (left) biases for diversity; Phase 2 (right) biases for quality.](../../assets/ultra3/figure-4.png)
 
 Pretraining consumes the tokenized output of `nemotron ultra3 data prep pretrain` (a Ray pipeline
 that tokenizes the open pretrain mixture to Megatron `bin/idx`), the same flow super3/nano3 use:
@@ -47,7 +49,7 @@ uv run nemotron ultra3 pretrain --run YOUR-CLUSTER
 
 SLURM execution comes from the shared `nemo_runspec` CLI machinery. `src/nemotron/cli/commands/ultra3/pretrain.py` parses the PEP-723 runspec header in `train.py`, merges YAML config with the `env.toml` profile, packages the script/config with `SelfContainedPackager`, and submits through NeMo-Run's Slurm executor for `--run` / `--batch`.
 
-No separate `sbatch` script is required in this repo.
+No separate training `sbatch` script is required in this repo. Container builds use the shared `nemotron kit slurm build <profile> --recipe ultra3 --stage pretrain` path (or the fallback `src/nemotron/recipes/ultra3/build.slurm.sh`).
 
 ## Long-context phase (not included)
 

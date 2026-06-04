@@ -68,7 +68,7 @@ Training can use either:
 Compatible with Megatron-Bridge's FinetuningDatasetConfig with packed Parquet shards.
 
 Pipeline:
-1. Apply ultra3 chat template → role-labeled chunks
+1. Apply nano3 chat template (shared across Nemotron 3) → role-labeled chunks
 2. Tokenize chunks → input_ids + loss_mask
 3. Pack sequences → Parquet shards with seq_start_id
 4. Distribute shards to train/valid/test splits
@@ -207,7 +207,7 @@ class SFTDataPrepConfig:
     """Fraction of data for test split"""
 
     # Chat template
-    chat_template: str = "ultra3"  # TODO: template may need to be created
+    chat_template: str = "nano3"  # shared nano3 template (super3 does the same); no Ultra-specific template in the tech report
     """Chat template: 'ultra3', path to .jinja file, or inline template"""
 
     messages_field: str = "messages"

@@ -36,6 +36,8 @@ portion.
 
 ## Overview
 
+![Nemotron 3 Ultra post-training pipeline: Base → SFT → RLVR → MOPD warmup → MOPD (×N cycles) → MTP boosting → Nemotron 3 Ultra.](../../assets/ultra3/figure-9.png)
+
 Nemotron 3 Ultra is post-trained with a multi-stage pipeline that mixes
 Reinforcement Learning with Verifiable Rewards (RLVR), RLHF, and Multi-Teacher
 On-Policy Distillation (MOPD) from a panel of specialised teacher models. The

@@ -15,24 +15,31 @@
 """Build command - build a recipe stage's Dockerfile into a .sqsh on a Slurm cluster.
 
 The build counterpart of ``nemotron kit slurm squash``: ``squash`` imports an
-existing image into a squash file; ``build`` adds a ``podman build`` of a
-recipe-owned Dockerfile in front of the same enroot-import-on-a-compute-node
-path. Slurm-only and explicit about it (that is why it lives under
-``kit slurm``); driven by an ``env.toml`` profile via nemo_runspec.
+existing image; ``build`` adds a ``podman build`` of a recipe-owned Dockerfile in
+front of the same enroot import. Slurm-only and explicit about it (hence the
+``kit slurm`` home); driven by an ``env.toml`` profile via nemo_runspec.
+
+Code transport: unlike ``squash``, ``build`` needs the repo (Dockerfile, build
+context, and the shared ``build_container.sh``) on the cluster, so it submits via
+a nemo-run ``SlurmExecutor`` with a ``CodePackager``. The packager rsyncs the
+local checkout to ``/nemo_run/code`` on the cluster — no manual sync, no
+``--repo-root``. Commit your changes first; the packager ships the git tree.
 
 The build logic itself lives in the shared, recipe-agnostic
-``build_container.sh`` next to this file; this command only resolves inputs from
-the profile + stage registry and submits it through the SSH tunnel.
+``build_container.sh`` next to this file; this command only resolves inputs and
+submits it as the executor payload.
 
 Usage:
-    nemotron kit slurm build dlw --recipe ultra3 --stage pretrain
-    nemotron kit slurm build dlw --dockerfile <path> --output my.sqsh
+    nemotron kit slurm build dlw --recipe ultra3 --stage pretrain \
+        --build-arg MEGATRON_BRIDGE_BRANCH=dev-0603
+    nemotron kit slurm build dlw --dockerfile src/.../Dockerfile --output my.sqsh
 """
 
 from __future__ import annotations
 
 import shlex
-from pathlib import PurePosixPath
+import tempfile
+from pathlib import Path, PurePosixPath
 
 import typer
 from rich.console import Console
@@ -40,12 +47,14 @@ from rich.panel import Panel
 from rich.table import Table
 
 from nemo_runspec.env import load_env_profile
-from nemo_runspec.squash import build_salloc_args, check_sqsh_exists
+from nemo_runspec.squash import resolve_build_cache_dir, resolve_build_image, resolve_build_partition, resolve_build_time
 
 console = Console()
 
 # Build-time podman/enroot container (pyxis launches it on the compute node).
-PODMAN_IMAGE = "docker://quay.io#podman/stable:v5.3"
+DEFAULT_BUILD_IMAGE = "docker://quay.io#podman/stable:v5.3"
+# Where CodePackager mounts the rsynced repo inside the build container.
+REMOTE_CODE_ROOT = "/nemo_run/code"
 
 # Stage registry — consolidates the per-recipe STAGES dicts the retired
 # ultra3/omni3 build.py dispatchers used to own. Maps recipe -> stage alias ->
@@ -62,23 +71,28 @@ RECIPES: dict[str, dict[str, tuple[str, str, str]]] = {
 }
 
 
+def _local_repo_root() -> Path:
+    # repo root is five levels up: .../<root>/src/nemotron/cli/kit/slurm/build.py
+    return Path(__file__).resolve().parents[5]
+
+
 def build(
     profile: str = typer.Argument(..., help="Env profile name from env.toml (e.g., 'dlw')."),
     recipe: str | None = typer.Option(None, "--recipe", help="Recipe to build (e.g. 'ultra3', 'omni3')."),
     stage: str | None = typer.Option(None, "--stage", help="Stage alias within the recipe (e.g. 'pretrain', 'sft')."),
-    dockerfile: str | None = typer.Option(None, "--dockerfile", help="Generic: remote abs path to a Dockerfile (overrides --recipe/--stage)."),
+    dockerfile: str | None = typer.Option(None, "--dockerfile", help="Generic: repo-relative path to a Dockerfile (overrides --recipe/--stage)."),
     output: str | None = typer.Option(None, "--output", help="Generic: output .sqsh basename (with --dockerfile)."),
-    repo_root: str | None = typer.Option(None, "--repo-root", help="Remote path to the checked-out repo on the cluster. Default: <remote_job_dir>/Nemotron."),
-    build_arg: list[str] = typer.Option([], "--build-arg", help="Docker build-arg, repeatable (e.g. MEGATRON_BRIDGE_BRANCH=...)."),
-    dry_run: bool = typer.Option(False, "-d", "--dry-run", help="Show the resolved salloc/srun command without executing."),
-    force: bool = typer.Option(False, "--force", help="Rebuild even if the .sqsh already exists."),
+    build_arg: list[str] = typer.Option([], "--build-arg", help="Docker build-arg, repeatable (e.g. MEGATRON_BRIDGE_BRANCH=dev-0603)."),
+    dry_run: bool = typer.Option(False, "-d", "--dry-run", help="Show the resolved plan without submitting."),
+    detach: bool = typer.Option(True, "--detach/--attach", help="Detach after submit (default) or stream the build."),
 ) -> None:
     """Build a recipe stage's Dockerfile into an enroot .sqsh on a Slurm cluster.
 
     Examples:
         nemotron kit slurm build dlw --recipe ultra3 --stage pretrain \\
-            --build-arg MEGATRON_BRIDGE_BRANCH=<branch> --build-arg MEGATRON_CORE_BRANCH=<branch>
-        nemotron kit slurm build dlw --dockerfile /repo/.../Dockerfile --output ultra3-pretrain.sqsh
+            --build-arg MEGATRON_BRIDGE_BRANCH=dev-0603
+        nemotron kit slurm build dlw --dockerfile src/nemotron/recipes/ultra3/stage0_pretrain/Dockerfile \\
+            --output ultra3-pretrain.sqsh
     """
     try:
         env_config = load_env_profile(profile)
@@ -96,70 +110,55 @@ def build(
         console.print(f"[red bold]Error:[/red bold] Profile '{profile}' missing remote_job_dir")
         raise typer.Exit(1)
 
-    # Remote repo checkout (holds the Dockerfile, build context, and the shared
-    # build_container.sh). Like `squash`, this command does not transport code;
-    # clone or rsync the repo onto a cluster-visible filesystem first.
-    repo = repo_root or str(PurePosixPath(remote_job_dir) / "Nemotron")
-    inner = str(PurePosixPath(repo) / "src/nemotron/cli/kit/slurm/build_container.sh")
+    local_root = _local_repo_root()
 
-    # Resolve build inputs: explicit --dockerfile/--output, else --recipe/--stage.
+    # Resolve build inputs. Paths come in two forms: a LOCAL path (CodePackager
+    # anchor) and the matching IN-CONTAINER path under REMOTE_CODE_ROOT.
     if dockerfile:
-        df = dockerfile
-        context = str(PurePosixPath(dockerfile).parent)
-        sqsh_name = output or (PurePosixPath(dockerfile).parent.name + ".sqsh")
+        rel = dockerfile if not Path(dockerfile).is_absolute() else str(Path(dockerfile).relative_to(local_root))
+        local_dockerfile = local_root / rel
+        df_in = f"{REMOTE_CODE_ROOT}/{rel}"
+        sqsh_name = output or (PurePosixPath(rel).parent.name + ".sqsh")
         image_tag = f"nemotron/{PurePosixPath(sqsh_name).stem}:latest"
         manifest_key = PurePosixPath(sqsh_name).stem
     else:
-        if not recipe or not stage:
-            console.print("[red bold]Error:[/red bold] provide --recipe and --stage, or --dockerfile/--output.")
-            console.print("\nKnown recipes/stages:")
+        if not recipe or not stage or recipe not in RECIPES or stage not in RECIPES.get(recipe, {}):
+            console.print("[red bold]Error:[/red bold] provide a known --recipe and --stage, or --dockerfile/--output.")
             for r, stages in RECIPES.items():
                 console.print(f"  {r}: {', '.join(stages)}")
             raise typer.Exit(1)
-        if recipe not in RECIPES or stage not in RECIPES[recipe]:
-            console.print(f"[red bold]Error:[/red bold] unknown recipe/stage '{recipe}/{stage}'.")
-            raise typer.Exit(1)
         stage_dir, image_tag, sqsh_name = RECIPES[recipe][stage]
-        df = str(PurePosixPath(repo) / f"src/nemotron/recipes/{recipe}/{stage_dir}/Dockerfile")
-        context = str(PurePosixPath(df).parent)
+        rel = f"src/nemotron/recipes/{recipe}/{stage_dir}/Dockerfile"
+        local_dockerfile = local_root / rel
+        df_in = f"{REMOTE_CODE_ROOT}/{rel}"
         manifest_key = f"{recipe}-{stage_dir}"
 
-    # Output + cache layout on the cluster.
-    build_cache_dir = env_config.get("build_cache_dir") or str(PurePosixPath(remote_job_dir) / "nemotron-cache")
+    if not local_dockerfile.is_file():
+        console.print(f"[red bold]Error:[/red bold] Dockerfile not found locally: {local_dockerfile}")
+        raise typer.Exit(1)
+
+    context_in = str(PurePosixPath(df_in).parent)
+    inner_in = f"{REMOTE_CODE_ROOT}/src/nemotron/cli/kit/slurm/build_container.sh"
+
+    # Cluster cache (Lustre): mounted at its host path; .sqsh + manifest land here.
+    build_cache_dir = str(resolve_build_cache_dir(env_config, Path(remote_job_dir) / "nemotron-cache"))
     containers_dir = str(PurePosixPath(build_cache_dir) / "containers")
     sqsh = str(PurePosixPath(containers_dir) / sqsh_name)
     manifest = str(PurePosixPath(containers_dir) / "manifest.yaml")
     build_args = " ".join(f"--build-arg {a}" for a in build_arg)
-
-    # Assemble the remote command: salloc a compute node, then srun a pyxis
-    # podman/stable container with the repo + cache mounted, running the shared
-    # inner build script with explicit inputs.
-    inner_env = (
-        f"DOCKERFILE={shlex.quote(df)} "
-        f"CONTEXT={shlex.quote(context)} "
-        f"IMAGE_TAG={shlex.quote(image_tag)} "
-        f"SQSH={shlex.quote(sqsh)} "
-        f"BUILD_CACHE_DIR={shlex.quote(build_cache_dir)} "
-        f"MANIFEST={shlex.quote(manifest)} "
-        f"MANIFEST_KEY={shlex.quote(manifest_key)} "
-        f"BUILD_ARGS={shlex.quote(build_args)}"
-    )
-    container_cmd = f"{inner_env} bash {shlex.quote(inner)}"
-    srun = (
-        f"srun --export=ALL --container-image={PODMAN_IMAGE} "
-        f"--container-mounts={repo}:{repo},{build_cache_dir}:{build_cache_dir} "
-        f"--no-container-mount-home bash -lc {shlex.quote(container_cmd)}"
-    )
-    salloc_args = build_salloc_args(env_config)
-    cmd = f"salloc {' '.join(salloc_args)} {srun}"
+    build_image = resolve_build_image(env_config, DEFAULT_BUILD_IMAGE)
+    partition = resolve_build_partition(env_config)
+    walltime = resolve_build_time(env_config, "02:00:00")
 
     table = Table(show_header=False, box=None, padding=(0, 2))
     table.add_column("Key", style="dim")
     table.add_column("Value")
     table.add_row("Profile", f"[cyan]{profile}[/cyan]")
     table.add_row("Host", f"{user}@{host}")
-    table.add_row("Repo (remote)", repo)
-    table.add_row("Dockerfile", df)
+    table.add_row("Code transport", f"CodePackager: {local_root} -> {REMOTE_CODE_ROOT}")
+    table.add_row("Dockerfile", df_in)
+    table.add_row("Build image", build_image)
+    table.add_row("Partition / time", f"{partition} / {walltime}")
     table.add_row("Image tag", image_tag)
     table.add_row("Output", sqsh)
     table.add_row("Manifest", f"{manifest} (key: {manifest_key})")
@@ -167,62 +166,95 @@ def build(
     console.print(Panel(table, title="[bold]Build Configuration[/bold]", expand=False))
     console.print()
 
+    # Inner payload: export explicit inputs, then run the shared build script.
+    inner_env = {
+        "DOCKERFILE": df_in,
+        "CONTEXT": context_in,
+        "IMAGE_TAG": image_tag,
+        "SQSH": sqsh,
+        "BUILD_CACHE_DIR": build_cache_dir,
+        "MANIFEST": manifest,
+        "MANIFEST_KEY": manifest_key,
+        "BUILD_ARGS": build_args,
+    }
+    inline = "; ".join(f"export {k}={shlex.quote(v)}" for k, v in inner_env.items())
+    inline += f"; bash {shlex.quote(inner_in)}"
+
     if dry_run:
-        console.print("[yellow]Dry-run mode - no changes will be made[/yellow]")
-        console.print(f"Would run on {host}:")
-        console.print(f"  [dim]{cmd}[/dim]")
+        console.print("[yellow]Dry-run mode - no submission.[/yellow]")
+        console.print("Payload (inside pyxis podman container):")
+        console.print(f"  [dim]{inline}[/dim]")
         return
 
     try:
         import nemo_run as run
     except ImportError:
         console.print("[red bold]Error:[/red bold] nemo-run is required for build")
-        console.print("Install with: pip install nemo-run")
         raise typer.Exit(1)
 
-    with console.status("[bold blue]Connecting to cluster..."):
-        tunnel = run.SSHTunnel(host=host, user=user, job_dir=remote_job_dir)
-        tunnel.connect()
-    console.print("[green]Connected![/green]")
-    console.print()
+    from nemo_runspec.execution import materialize_podman_auth_from_enroot
 
-    if not force and check_sqsh_exists(tunnel, sqsh):
-        console.print(f"[yellow]Squash file already exists:[/yellow] {sqsh}")
-        console.print("[dim]Skipping build. Use --force to rebuild.[/dim]")
-        tunnel.cleanup()
-        return
+    tunnel = run.SSHTunnel(host=host, user=user, job_dir=remote_job_dir)
+    tunnel.connect()
+
+    # Mounts: the build cache (Lustre) at its host path, plus best-effort podman
+    # auth bridged from the user's enroot credentials so FROM nvcr.io/... pulls.
+    mounts = [f"{build_cache_dir}:{build_cache_dir}"]
+    try:
+        auth_path = materialize_podman_auth_from_enroot(tunnel, f"{build_cache_dir}/.auth")
+        if auth_path:
+            mounts.append(f"{auth_path}:/root/.config/containers/auth.json:ro")
+    except Exception as exc:  # best-effort; rely on cluster creds / cached base otherwise
+        console.print(f"[dim]podman auth bridge skipped: {exc}[/dim]")
 
     tunnel.run(f"mkdir -p {containers_dir}", hide=True)
-    if force:
-        tunnel.run(f"rm -f {sqsh}", hide=True)
 
-    console.print("[bold]Allocating compute node and building container...[/bold]")
-    console.print(f"  {df}")
-    console.print(f"  -> {sqsh}")
-    console.print(f"[dim]$ {cmd}[/dim]")
-    console.print("[dim]This may take many minutes...[/dim]")
-    console.print()
+    # CodePackager ships the local checkout to REMOTE_CODE_ROOT. A placeholder
+    # train config keeps the packager happy; the Dockerfile is the real anchor.
+    tmp_cfg = tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False)
+    tmp_cfg.write("{}\n")
+    tmp_cfg.close()
 
-    result = tunnel.run(cmd, hide=False, warn=True)
-    tunnel.cleanup()
+    try:
+        from nemo_runspec.packaging import CodePackager
 
-    if result.ok:
+        packager = CodePackager(script_path=str(local_dockerfile), train_path=tmp_cfg.name)
+        executor = run.SlurmExecutor(
+            account=env_config.get("account"),
+            partition=partition,
+            nodes=1,
+            ntasks_per_node=1,
+            gpus_per_node=0,
+            cpus_per_task=env_config.get("build_cpus", 16),
+            time=walltime,
+            container_image=build_image,
+            container_mounts=mounts,
+            # Run the build container as root so the in-container `enroot import`
+            # can unpack root-owned image files (rootless unpack fails with
+            # Permission denied and hangs). The host has no podman and enroot
+            # reads no portable archive, so the import must stay in-container via
+            # podman:// — hence root here rather than a host-side import.
+            srun_args=["--container-remap-root", "--container-writable"],
+            tunnel=tunnel,
+            packager=packager,
+            mem=env_config.get("build_mem") or env_config.get("mem"),
+            launcher=None,
+        )
+        task = run.Script(inline=inline, entrypoint="bash")
+        name = f"kit-build-{manifest_key}"
+        console.print(f"[bold]Submitting build '{name}' to {host} ({partition})...[/bold]")
+        console.print(f"  -> {sqsh}")
+        with run.Experiment(name) as exp:
+            exp.add(task, executor=executor, name=name)
+            exp.run(detach=detach)
         console.print(
             Panel(
-                f"[green]Built and imported:[/green]\n{sqsh}\n\n"
+                f"[green]Build submitted.[/green]\nOn success: {sqsh}\n\n"
                 f"[dim]run with: ... run.env.container_image={sqsh}[/dim]",
-                title="[bold green]Complete[/bold green]",
+                title="[bold green]Submitted[/bold green]",
                 border_style="green",
                 expand=False,
             )
         )
-    else:
-        console.print(
-            Panel(
-                f"[red]Build failed[/red]\n{result.stderr or 'Unknown error'}",
-                title="[bold red]Error[/bold red]",
-                border_style="red",
-                expand=False,
-            )
-        )
-        raise typer.Exit(1)
+    finally:
+        Path(tmp_cfg.name).unlink(missing_ok=True)

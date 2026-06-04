@@ -19,7 +19,7 @@ Answer questions about:
 - quantization (NVFP4, SSM-cache) and inference / serving behavior
 - evaluation results and benchmark setup
 
-Use this skill as a **knowledge base**, not a code generator. When the user wants to build, fine-tune, or reproduce a pipeline, hand off to **`/nemotron-customize`**.
+Use this skill primarily as a **knowledge base**. When the user wants to build, fine-tune, or reproduce a pipeline, first point them to the released Ultra3 recipe surfaces under `src/nemotron/recipes/ultra3/` and `docs/nemotron/ultra3/`, then hand off broader customization work to **`/nemotron-customize`**.
 
 ---
 
@@ -54,7 +54,7 @@ Resolve conflicts in this order:
 1. `skills/nemotron-ultra/paper/*.md` (and `paper/mopd/*.md`)
 2. `skills/nemotron-ultra/model-card.md`
 3. `skills/nemotron-ultra/context/quick-reference.md`
-4. `skills/nemotron-ultra/recipes/*.md` (release-tracking only — see caveat)
+4. `skills/nemotron-ultra/recipes/*.md` (recipe status and runnable-surface tracking)
 
 Interpretation:
 
@@ -130,8 +130,8 @@ If you synthesize across files, say so.
 ## Known caveats to surface
 
 1. **MOPD ≠ classic RLHF.** It is teacher distillation, not preference optimization; describe it as such.
-2. **Release is staged.** Per the repo cookbook, the initial Ultra release is the base checkpoint; the full post-trained / NVFP4 release is expected 1H 2026. Do not imply all checkpoints are downloadable today.
-3. **No public Ultra recipe tree yet.** Unlike Nano3/Super3, `src/nemotron/recipes/` has no `ultra` stage code at the time of writing. `recipes/` here is a release-tracking stub, not a runnable path.
+2. **Release is staged.** Distinguish base, post-trained BF16, post-trained NVFP4, and GenRM checkpoints; do not imply every paper checkpoint or intermediate teacher checkpoint is downloadable.
+3. **Runnable Ultra3 recipe coverage is partial.** `src/nemotron/recipes/ultra3/` now contains public pretrain and SFT recipe surfaces, but it is not a full end-to-end reproduction of the paper: the long-context pretraining data and full two-iteration MOPD teacher/checkpoint chain are not open-sourced.
 4. **Pretraining vs post-training quantization** are distinct.
 
 ---
@@ -141,10 +141,11 @@ If you synthesize across files, say so.
 If the user shifts from **describing Ultra** to **building/modifying a pipeline** ("build an Ultra SFT pipeline", "set up MOPD", "generate configs"):
 
 1. give the relevant Ultra stage order first,
-2. note that no public Ultra recipe tree exists yet (route pretraining/MOPD as Explorer-mode or Super3-analog work),
-3. then hand implementation to `/nemotron-customize`.
+2. point to the released pretrain/SFT recipe surfaces in `src/nemotron/recipes/ultra3/` and `docs/nemotron/ultra3/`,
+3. state the remaining public-recipe gaps clearly: no bundled long-context pretraining data and no full two-iteration MOPD reproduction because intermediate teacher/student checkpoints are not open,
+4. then hand broader implementation/customization work to `/nemotron-customize`.
 
-Do not invent missing configs or step contracts inside this skill.
+Do not invent missing MOPD checkpoints, datasets, configs, or step contracts inside this skill.
 
 ---
 

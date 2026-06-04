@@ -1,6 +1,6 @@
 run:
   env:
-    container: anyscale/ray:2.49.2-py312
+    container: anyscale/ray:2.55.1-py312
 
 # Tiny pretrain config for fast CLI/runspec validation.
 

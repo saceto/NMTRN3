@@ -38,6 +38,8 @@ Answers:
 - **LatentMoE** (Elango et al., 2026) for MoE layers — same as Super3, scaled to 550B/55B.
 - **Native MTP** for inference acceleration with **two heads during pre-training**; both MTP heads **share the same parameters** for robust autoregressive drafting (as in NVIDIA 2026). Each MTP head = one attention layer + one MoE layer.
 
+![Nemotron 3 Ultra layer pattern (Figure 2): hybrid Mamba-2 + Attention blocks interleaved with LatentMoE.](../../../docs/assets/ultra3/figure-2.png)
+
 # Table 1 — Architecture Dimensions
 
 | Configuration | Nemotron 3 Ultra |

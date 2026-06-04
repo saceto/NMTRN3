@@ -47,8 +47,10 @@ families, §3.1) with a `_missing_categories` block for internal-only domains. A
 chat template, role-masks losses, packs sequences, and writes packed Parquet with
 per-split `blend.json`.
 
-> Open items (`TODO(ultra3)`): the Ultra tokenizer id, the `ultra3` chat template, and the
-> `used_in_filter` tag (Super3 used `super_v3`; placeholder here is `ultra_v3`).
+> Chat template: reuses the shared `nano3` template (super3 does the same; the tech report does
+> not define an Ultra-specific template). `used_in_filter: nano_v3` matches the open SFT datasets.
+> Still `TODO(ultra3)`: confirm the released Ultra tokenizer id, and swap to a dedicated
+> `templates/ultra3.jinja` only if the post-trained Ultra tokenizer ships a different `chat_template`.
 
 ## Training on packed Parquet (default)
 

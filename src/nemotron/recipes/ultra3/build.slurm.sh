@@ -97,6 +97,8 @@ MOUNTS="${REPO_ROOT}:${REPO_ROOT},${BUILD_CACHE_DIR}:${BUILD_CACHE_DIR}"
 SRUN_CMD=(srun --mpi=none --ntasks=1
     --container-image="${PODMAN_IMAGE}"
     --container-mounts="${MOUNTS}"
+    --container-remap-root
+    --container-writable
     --no-container-mount-home
     --export=ALL
     bash "${INNER}")

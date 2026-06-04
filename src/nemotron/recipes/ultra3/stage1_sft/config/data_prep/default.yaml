@@ -1,6 +1,6 @@
 run:
   env:
-    container: anyscale/ray:2.49.2-py312
+    container: anyscale/ray:2.55.1-py312
 
 # Default Ultra3 SFT data-prep config: apply chat template, role-mask, pack to Parquet.
 
@@ -29,15 +29,15 @@ valid_ratio: 0.01
 test_ratio: 0.01
 
 # Chat template: 'ultra3', path to .jinja, or inline.
-# TODO(ultra3): register the Ultra chat template (or point at the tokenizer's built-in template).
-chat_template: ultra3
+# Reuse the shared nano3 template (super3 does the same; the tech report does not specify an Ultra template). Swap to templates/ultra3.jinja only if the released Ultra tokenizer ships a different chat_template.
+chat_template: nano3
 
 messages_field: messages
 tools_field: tools
 
 # Filter to records whose used_in contains this tag.
-# TODO(ultra3): set the Ultra SFT filter tag (Super3 used 'super_v3').
-used_in_filter: ultra_v3
+# Matches the open SFT datasets' used_in tag (same as nano3/super3). Update if the released Ultra SFT data uses a distinct tag.
+used_in_filter: nano_v3
 used_in_field: used_in
 
 max_doc_tokens: null

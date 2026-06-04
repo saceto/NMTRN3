@@ -67,6 +67,8 @@ Answers:
 
 ## Figure 4 — Phase mixture breakdown (high-level category shares)
 
+![Figure 4: pretraining data mixtures — Phase 1 (left) biases diversity, Phase 2 (right) biases quality.](../../../docs/assets/ultra3/figure-4.png)
+
 | Category | Phase 1 | Phase 2 |
 |---|---|---|
 | syn-crawl-high | 22.4% | 23.6% |
