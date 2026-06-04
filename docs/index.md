@@ -44,7 +44,7 @@ $ uv run nemotron nano3 rl --run YOUR-CLUSTER
 :link: deployment-guides
 :link-type: doc
 
-Deployment guides for Nemotron models: TensorRT-LLM, vLLM, SGLang, NIM, and Hugging Face.
+Deployment guides for Nemotron models: TensorRT-LLM, vLLM, SGLang, NIM, Hugging Face, and agent harnesses.
 :::
 
 :::{grid-item-card} Sample Applications
@@ -104,6 +104,24 @@ Evaluate hosted endpoints or checkpoints with `eval/model_eval`.
 ::::{grid} 1 2 2 2
 :gutter: 3
 
+:::{grid-item-card} Nemotron 3 Ultra
+:link: nemotron/ultra3/README
+:link-type: doc
+
+550B total / 55B active parameters, 20T tokens, up to 1M context. Hybrid Mamba-Attention MoE with LatentMoE and MTP.
+
+**Stages:** Pretraining → SFT → RLVR → MOPD
+:::
+
+:::{grid-item-card} Nemotron 3 Super
+:link: nemotron/super3/README
+:link-type: doc
+
+120.6B total / 12.7B active parameters, up to 1M context. Hybrid Mamba-Transformer with sparse Latent MoE.
+
+**Stages:** Pretraining → SFT → RL → Quantization → Eval
+:::
+
 :::{grid-item-card} Nemotron 3 Nano
 :link: nemotron/nano3/README
 :link-type: doc
@@ -161,6 +179,7 @@ Each recipe family has its own stage layout, and all of them can be tracked thro
 | [Nano3](nemotron/nano3/README.md) | Pretraining → SFT → RL |
 | [Omni3](nemotron/omni3/README.md) | SFT → RL MPO → RL text → RL vision → Eval |
 | [Super3](nemotron/super3/README.md) | Pretraining → SFT → RL → Quantization → Eval |
+| [Ultra3](nemotron/ultra3/README.md) | Pretraining → SFT → RLVR → MOPD |
 | [Embed](nemotron/embed/README.md) | SDG → Data Prep → Finetune → Eval → Export → Deploy |
 | [Rerank](nemotron/rerank/README.md) | SDG → Data Prep → Finetune → Eval → Export → Deploy |
 
@@ -284,6 +303,7 @@ Reference <model-eval/reference/index.md>
 Nemotron 3 Nano <nemotron/nano3/README.md>
 Nemotron 3 Omni <nemotron/omni3/README.md>
 Nemotron 3 Super <nemotron/super3/README.md>
+Nemotron 3 Ultra <nemotron/ultra3/README.md>
 Llama Nemotron Embed <nemotron/embed/README.md>
 Llama Nemotron Rerank <nemotron/rerank/README.md>
 nemotron/artifacts.md
