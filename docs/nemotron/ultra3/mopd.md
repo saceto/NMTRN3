@@ -3,7 +3,9 @@
 **Technical Report:** _TBD — link to the Nemotron 3 Ultra technical report once published._
 
 This guide explains how to post-train the Nemotron 3 Ultra model with NeMo RL on
-**GB200 NVL72** (ARM64 / aarch64) hardware.
+**GB200 NVL72** (ARM64 / aarch64) hardware. All commands, configs (`examples/configs/ultra/`),
+launcher (`ultra_launch.sh`), and converter/build scripts below come from the
+[`ultra-v3` branch of NVIDIA-NeMo/RL](https://github.com/NVIDIA-NeMo/RL/tree/ultra-v3).
 
 > **Scope: this is not a full replication of the Ultra RL pipeline.**
 > The full post-training program in the technical report is substantially larger
@@ -125,12 +127,15 @@ Build args:
   Dockerfile pulls `NVIDIA-NeMo/RL.git#main`).
 
 To run on the cluster with Slurm, convert the image to a squashfs (`.sqsh`)
-with [enroot](https://github.com/NVIDIA/enroot), then pass that path as
-`CONTAINER` to the launcher:
+with [enroot](https://github.com/NVIDIA/enroot):
 
 ```bash
-enroot import -o nemo-rl-ultra.sqsh dockerd://nemo-rl-ultra:arm64
+enroot import -o nemo-rl-container.sqsh dockerd://nemo-rl-ultra:arm64
 ```
+
+Pass the resulting image as `CONTAINER` in every launch command below (shown as
+`CONTAINER=/path/to/nemo-rl-container` — a `.sqsh` path, or a registry image URI
+if you're not using enroot). All Ultra stages run from this single image.
 
 ## Download and prepare the data
 
@@ -244,7 +249,7 @@ Set the following before each `bash ultra_launch.sh` invocation:
 | `MODEL_PATH` | Initial policy checkpoint (HuggingFace repo id or local path). Student RLVR starts from the Ultra SFT checkpoint; the teacher stages start from the Student RLVR checkpoint; MOPD starts from the student (the Student RLVR checkpoint). |
 | `TRAIN_PATH` | Training data JSONL. |
 | `VAL_PATH` | Validation data JSONL. |
-| `CONTAINER` | NeMo RL container image (NGC URI or `.sqsh` path). |
+| `CONTAINER` | NeMo RL container image (`.sqsh` path or registry image URI). |
 | `SANDBOX_CONTAINER` | Sandbox image from [Build the sandbox container](#build-the-sandbox-container). |
 | `PERSISTENT_CACHE` | Directory on a shared filesystem (e.g. Lustre) where vLLM/Triton/Inductor compile caches are persisted across runs. |
 | `EXTRA_MOUNTS` | Comma-separated `host:container` mount pairs for any shared filesystems holding your data, model checkpoints, and `PERSISTENT_CACHE` (e.g. `EXTRA_MOUNTS=/lustre:/lustre,/scratch:/scratch`). |
@@ -296,7 +301,7 @@ NRL_MAX_STEPS=128 \
 MODEL_PATH=/path/to/ultra_sft_checkpoint \
 TRAIN_PATH=$DATA_DIR/rlvr1.train.jsonl \
 VAL_PATH=$DATA_DIR/rlvr1.val.jsonl \
-CONTAINER=nvcr.io/nvidia/nemo-rl:<tag> \
+CONTAINER=/path/to/nemo-rl-container \
 SANDBOX_CONTAINER=/path/to/nemo-skills-sandbox.sqsh \
 PERSISTENT_CACHE=/path/to/persistent/cache \
 EXTRA_MOUNTS=/lustre:/lustre \
@@ -326,7 +331,7 @@ NRL_MAX_STEPS=178 \
 MODEL_PATH=/path/to/ultra_sft_checkpoint \
 TRAIN_PATH=$DATA_DIR/rlvr2.train.jsonl \
 VAL_PATH=$DATA_DIR/rlvr2.val.jsonl \
-CONTAINER=nvcr.io/nvidia/nemo-rl:<tag> \
+CONTAINER=/path/to/nemo-rl-container \
 SANDBOX_CONTAINER=/path/to/nemo-skills-sandbox.sqsh \
 PERSISTENT_CACHE=/path/to/persistent/cache \
 EXTRA_MOUNTS=/lustre:/lustre \
@@ -379,7 +384,7 @@ NUM_TRAIN_NODES=32 \
 NUM_GEN_NODES=28 \
 NUM_GYM_NODES=20 \
 ENABLE_MTP_INFERENCE=1 \
-CONTAINER=nvcr.io/nvidia/nemo-rl:<tag> \
+CONTAINER=/path/to/nemo-rl-container \
 SANDBOX_CONTAINER=/path/to/nemo-skills-sandbox.sqsh \
 PERSISTENT_CACHE=/path/to/persistent/cache \
 EXTRA_MOUNTS=/lustre:/lustre \
@@ -417,7 +422,7 @@ NUM_TRAIN_NODES=32 \
 NUM_GEN_NODES=28 \
 NUM_GYM_NODES=4 \
 ENABLE_MTP_INFERENCE=1 \
-CONTAINER=nvcr.io/nvidia/nemo-rl:<tag> \
+CONTAINER=/path/to/nemo-rl-container \
 SANDBOX_CONTAINER=/path/to/nemo-skills-sandbox.sqsh \
 PERSISTENT_CACHE=/path/to/persistent/cache \
 EXTRA_MOUNTS=/lustre:/lustre \
@@ -461,7 +466,7 @@ VAL_PATH=$DATA_DIR/reasoning.val.jsonl \
 NUM_TRAIN_NODES=64 \
 NUM_GEN_NODES=60 \
 NUM_GYM_NODES=4 \
-CONTAINER=nvcr.io/nvidia/nemo-rl:<tag> \
+CONTAINER=/path/to/nemo-rl-container \
 SANDBOX_CONTAINER=/path/to/nemo-skills-sandbox.sqsh \
 PERSISTENT_CACHE=/path/to/persistent/cache \
 EXTRA_MOUNTS=/lustre:/lustre \
@@ -510,9 +515,19 @@ need a container **registry** to publish to: set `REGISTRY` to its endpoint and
 there, and the conversion step (3) pulls them back to produce the `.sif` files —
 so the registry must be reachable from both the build and the convert hosts.
 
-> **Storage.** The registry accumulates ~7,800 images (tens to hundreds of GB),
-> plus the converted `.sif` set on the build host. The pushed images can be
-> deleted once every `.sif` has been built.
+Install Apptainer on the build host via the official PPA, pinned to the version
+the training container ships (so the `.sif` format matches — see
+`docker/install_apptainer.sh`):
+
+```bash
+sudo add-apt-repository -y ppa:apptainer/ppa
+sudo apt-get update
+sudo apt-get install -y "apptainer=1.5.0-2-1~$(. /etc/os-release && echo "$VERSION_CODENAME")"
+```
+
+> **Storage.** The registry accumulates ~7,800 images, plus the converted `.sif`
+> set on the build host. The pushed images can be deleted once every `.sif` has
+> been built.
 
 **2. Build the per-instance images.**
 ```bash
@@ -551,31 +566,19 @@ python3 scripts/build_eval_cleanup.py \
 deactivate; cd ..
 ```
 
-**3. Convert to `.sif` and lay out `${SIF_DIR}`.** Pull each published image and
-convert it to apptainer under the exact filename the recipe expects. Adjust the
-`docker://` references to match the tags your build step pushed (see the build
-state/report files):
+**3. Convert to `.sif` and lay out `${SIF_DIR}`.** `build_swe_sif_images.py` pulls
+each published image and runs `apptainer build` under the exact filename the
+recipe expects — SWE-Gym from the `swe-gym:sweb.eval.arm64.<id>` tags, and
+SWE-rebench-V2 from the verified (`passed_match`) instances in `eval_report.json`.
+It skips images already converted and continues past any that are missing (e.g.
+instances that failed to build), recording them in `${SIF_DIR}/missing_instances.txt`.
+Run it from the NeMo RL repo root:
 ```bash
 export SIF_DIR=/path/to/sif/images
-mkdir -p "${SIF_DIR}/swegym" "${SIF_DIR}/swerebench"
-
-# SWE-Gym: image tag sweb.eval.arm64.<id>  ->  swegym/sweb.eval.arm64.<id>.sif
-while read -r id; do
-  apptainer build "${SIF_DIR}/swegym/sweb.eval.arm64.${id}.sif" \
-    "docker://${REGISTRY}/swe-gym/sweb.eval.arm64.${id}:latest"
-done < swe-gym-arm-build/swe_gym_instance_ids.txt
-
-# SWE-rebench-V2: image tag <id>  ->  swerebench/<id>.sif (verified instances only)
-python3 - <<'PY'
-import json, os, subprocess
-reg, sif = os.environ["REGISTRY"], os.environ["SIF_DIR"]
-for r in json.load(open("swe-rebench-v2-arm-build/eval_report.json")):
-    if not r.get("passed_match"):        # respect the verify gate
-        continue
-    iid = r["instance_id"]
-    subprocess.run(["apptainer", "build", f"{sif}/swerebench/{iid}.sif",
-                    f"docker://{reg}/swerebenchv2/{iid}:latest"], check=True)
-PY
+python examples/nemo_gym/build_swe_sif_images.py \
+  --registry "${REGISTRY}" --sif-dir "${SIF_DIR}" \
+  --swe-gym-ids /path/to/swe-gym-arm-build/swe_gym_instance_ids.txt \
+  --rebench-report /path/to/swe-rebench-v2-arm-build/eval_report.json
 ```
 
 With `${SIF_DIR}` populated, launch the SWE teacher:
@@ -591,7 +594,7 @@ NUM_TRAIN_NODES=64 \
 NUM_GEN_NODES=64 \
 NUM_GYM_NODES=0 \
 SIF_DIR=/path/to/sif/images \
-CONTAINER=nvcr.io/nvidia/nemo-rl:<tag> \
+CONTAINER=/path/to/nemo-rl-container \
 SANDBOX_CONTAINER=/path/to/nemo-skills-sandbox.sqsh \
 PERSISTENT_CACHE=/path/to/persistent/cache \
 EXTRA_MOUNTS=/lustre:/lustre \
@@ -652,7 +655,7 @@ NRL_RLHF_TEACHER_PATH=/path/to/rlhf_teacher_output \
 NRL_IFBENCH_TEACHER_PATH=/path/to/ifbench_teacher_output \
 NRL_REASONING_TEACHER_PATH=/path/to/reasoning_teacher_output \
 NRL_SWE_TEACHER_PATH=/path/to/swe_teacher_output \
-CONTAINER=nvcr.io/nvidia/nemo-rl:<tag> \
+CONTAINER=/path/to/nemo-rl-container \
 SANDBOX_CONTAINER=/path/to/nemo-skills-sandbox.sqsh \
 PERSISTENT_CACHE=/path/to/persistent/cache \
 EXTRA_MOUNTS=/lustre:/lustre \

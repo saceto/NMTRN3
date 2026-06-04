@@ -2,8 +2,7 @@
 #
 # Wraps the real Megatron-Bridge Ultra SFT recipe, but overrides its inherited
 # OpenMath/demo values with Nemotron 3 Ultra paper §3.1 values. This default
-# consumes Super-style packed Parquet emitted by Ultra3 data prep; `openmath.yaml`
-# remains the MB OpenMathInstruct-2 fallback/demo path.
+# consumes Super-style packed Parquet emitted by Ultra3 data prep.
 
 run:
   data: ultra3-sft-data:latest
@@ -16,7 +15,7 @@ run:
 
 recipe:
   _target_: megatron.bridge.recipes.nemotronh.nemotron_3_ultra.nemotron_3_ultra_sft_openmathinstruct2_packed_config
-  hf_path: nvidia/nemotron-ultra-rl-052726
+  hf_path: nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16
   seq_length: 294912
 
 # Dataset config for packed Parquet shards from data_prep.

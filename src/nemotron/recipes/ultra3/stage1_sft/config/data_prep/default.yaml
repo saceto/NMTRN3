@@ -13,16 +13,18 @@ output_dir: ${oc.env:PWD}/../output/ultra3/stage1_sft/default
 num_shards: 128
 
 # Tokenizer configuration (nested)
-# TODO(ultra3): confirm the released Ultra tokenizer repo id on 2026-06-04.
 tokenizer:
-  model: nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-Base-BF16
+  model: nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16
   add_bos: false
   add_eos: true
 
-pack_size: 4096
+pack_size: 294912  # match training seq_length (paper §3.1 packed SFT length)
 algorithm: first_fit_shuffle
 seed: null
-parquet_row_group_size: 1000
+# Rows per Parquet row group. Each packed row is ~1.2 MB at 294,912 int32 tokens,
+# so the writer buffers row_group_size packs before flushing — keep this small
+# (16 ≈ ~24 MB/group) to avoid OOM. (Was 1000, which is ~1.5 GB/group at this pack.)
+parquet_row_group_size: 16
 parquet_compression: zstd
 train_ratio: 0.98
 valid_ratio: 0.01

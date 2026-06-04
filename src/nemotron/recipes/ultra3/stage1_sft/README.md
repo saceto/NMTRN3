@@ -1,9 +1,7 @@
 # Stage 1: SFT
 
-Ultra3 SFT supports two data consumption paths:
-
-1. **Default packed-Parquet path** (`config/default.yaml`, `config/tiny.yaml`): consumes packed SFT Parquet emitted by the Super3-style data-prep pipeline.
-2. **OpenMathInstruct-2 fallback** (`config/openmath.yaml`): omits `dataset:` so the Megatron-Bridge recipe keeps its built-in OpenMathInstruct-2 download/packing dataset.
+Ultra3 SFT consumes packed SFT Parquet emitted by the Super3-style data-prep
+pipeline (`config/default.yaml`, `config/tiny.yaml`).
 
 ## Overview
 
@@ -13,27 +11,28 @@ Ultra3 SFT supports two data consumption paths:
 | `train.py` | Runs Megatron-Bridge `nemotron_3_ultra_sft_openmathinstruct2_packed_config`; overrides the dataset only when YAML contains `dataset:`. |
 | `config/data_prep/{default,tiny}.yaml` + `data_blend_raw.json` | Data-prep configs + SFT blend. |
 | `config/default.yaml`, `config/tiny.yaml` | `default`: paper-style packed SFT (pack 294,912, GBS 64, cosine LR, inferred CP8); `tiny`: 36-node 550B-A55B smoke test (seq 2048, TP2/PP36/EP4). |
-| `config/openmath.yaml` | No-data-prep fallback config using the MB OpenMathInstruct-2 dataset path. |
 | `Dockerfile` | Builds the Ultra3 SFT training image on top of `nvcr.io/nvidia/nemo:26.04.01`. |
 
 ## Container image
 
-Ultra3 does **not** ship a released SFT container tag. Build the squashfs image
-before running this stage:
+Ultra3 ships no released training container — the stage owns a `Dockerfile` that
+builds the `nemotron_3_ultra` Megatron-Bridge branch on
+`nvcr.io/nvidia/nemo:26.04.01`. Build it before running this stage.
+
+On Slurm (our CLI builds only on Slurm):
 
 ```bash
-uv run nemotron ultra3 build sft --run YOUR-CLUSTER --dry-run
-uv run nemotron ultra3 build sft --run YOUR-CLUSTER -- \
-  --build-arg MEGATRON_BRIDGE_BRANCH=<ultra-release-branch> \
-  --build-arg MEGATRON_CORE_BRANCH=<ultra-mcore-branch>
+uv run nemotron kit slurm build <profile> --recipe ultra3 --stage sft
 ```
 
-The Dockerfile follows the Ultra Megatron-Bridge README's Day-0 code flow:
-start from `nvcr.io/nvidia/nemo:26.04.01`, clone the Ultra MB branch, checkout
-the matching Megatron-LM branch, run `uv lock && uv sync`, and sanity-import
-`nemotron_3_ultra_sft_openmathinstruct2_packed_config`. The output is
-`~/.cache/nemotron/containers/ultra3-sft.sqsh` by default, and the train
-configs/runspec header point at that path.
+Or build the Dockerfile directly with Docker on any host:
+
+```bash
+docker build -t ultra3-sft src/nemotron/recipes/ultra3/stage1_sft
+```
+
+The train configs/runspec expect the resulting squashfs at
+`${build_cache_dir:-~/.cache/nemotron}/containers/ultra3-sft.sqsh`.
 
 ## Data prep — pack the open SFT blend
 
@@ -83,21 +82,10 @@ uv run nemotron ultra3 sft -c tiny --run YOUR-CLUSTER --dry-run
 uv run nemotron ultra3 sft --run YOUR-CLUSTER
 ```
 
-## Training with OpenMathInstruct-2 fallback
-
-Use `config/openmath.yaml` when you do not want to consume an external data-prep artifact:
-
-```bash
-uv run nemotron ultra3 sft -c openmath --run YOUR-CLUSTER --dry-run
-```
-
-Because this config has no `dataset:` block, `train.py` leaves the Megatron-Bridge recipe's
-`default_openmathinstruct2_config(..., packed_sequence=True)` dataset untouched.
-
 ## Recipe details
 
 - MB recipe: `megatron.bridge.recipes.nemotronh.nemotron_3_ultra.nemotron_3_ultra_sft_openmathinstruct2_packed_config`
-- HF path: `nvidia/nemotron-ultra-rl-052726` · Container: `~/.cache/nemotron/containers/ultra3-sft.sqsh`
+- HF path: `nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16` · Container: `~/.cache/nemotron/containers/ultra3-sft.sqsh`
 - Launch: `torchrun` via runspec; `default` resources 384 nodes × 8 GPUs; `tiny` resources 36 nodes × 8 GPUs
 - `default`: paper §3.1 values — packed length 294,912 (via `${art:data,pack_size}`), global batch 64, 3,200 iterations, cosine LR 1.5e-5 → 1e-6, 150 warmup iters, MTP loss scaling 0.1
 - `default` parallelism: TP=2, PP=6, EP=32, ETP=1, CP=8, sequence parallel enabled. CP8 is inferred for 294,912-token packed SFT; the paper does not state SFT parallelism.

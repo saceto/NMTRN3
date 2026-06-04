@@ -14,27 +14,25 @@
 # limitations under the License.
 
 # ==============================================================================
-# Generic container-build steps — single source of truth.
+# Container build + push (single source of truth) — runs INSIDE the pyxis
+# podman/stable container.
 #
-# Runs INSIDE the podman/stable (pyxis) container. Recipe-agnostic: every input
-# is explicit, so the same script serves `nemotron kit slurm build` (env.toml /
-# nemo_runspec driven) and the transparent per-recipe build.slurm.sh wrappers.
-# It installs enroot at runtime, builds a Dockerfile with podman, imports the
-# image to an enroot .sqsh, and upserts the shared container manifest that `run`
-# consumes via `container_image=<path>`.
+# It ONLY builds the recipe Dockerfile and pushes the image to a registry. The
+# enroot import (image -> .sqsh) is deliberately NOT here: a nested unprivileged
+# `enroot import` inside a pyxis container fails (it can't create the user
+# namespace it needs to unpack — Permission denied). Instead the image is pushed
+# to a registry and imported on the HOST via `enroot import docker://...` (the
+# proven `kit squash` path). See the kit slurm build command for the host step.
 #
 # Required inputs (environment):
-#   DOCKERFILE       abs path to the recipe-owned Dockerfile
-#   CONTEXT          abs path to the build context directory
-#   IMAGE_TAG        build-time podman image tag (transient)
-#   SQSH             abs output .sqsh path
-#   BUILD_CACHE_DIR  cluster-visible scratch dir for enroot (Lustre)
+#   DOCKERFILE   abs path to the recipe-owned Dockerfile
+#   CONTEXT      abs path to the build context directory
+#   IMAGE_REF    full registry ref to push, e.g.
+#                gitlab-master.nvidia.com:5005/<repo>/ultra3-pretrain:latest
 # Optional:
-#   MANIFEST_KEY     manifest key (default: basename of SQSH without .sqsh)
-#   MANIFEST         manifest path (default: <dir of SQSH>/manifest.yaml)
-#   ENROOT_VERSION   enroot to install in the build container (default 3.5.0)
-#   BUILD_ARGS       passthrough to `podman build` (e.g. --build-arg FOO=bar)
-#   NGC_API_KEY      optional; `podman login nvcr.io` for the FROM base image
+#   BUILD_ARGS   passthrough to `podman build` (e.g. --build-arg FOO=bar)
+#   REGISTRY_HOST + REGISTRY_TOKEN  podman login before push (otherwise a
+#                mounted /root/.config/containers/auth.json is used).
 # ==============================================================================
 
 set -euo pipefail
@@ -42,102 +40,27 @@ export TERM=dumb NO_COLOR=1
 
 DOCKERFILE="${DOCKERFILE:?DOCKERFILE required}"
 CONTEXT="${CONTEXT:?CONTEXT required}"
-IMAGE_TAG="${IMAGE_TAG:?IMAGE_TAG required}"
-SQSH="${SQSH:?SQSH required (abs output .sqsh path)}"
-BUILD_CACHE_DIR="${BUILD_CACHE_DIR:?BUILD_CACHE_DIR required (cluster-visible scratch dir)}"
-ENROOT_VERSION="${ENROOT_VERSION:-3.5.0}"
+IMAGE_REF="${IMAGE_REF:?IMAGE_REF required (registry ref to push)}"
 BUILD_ARGS="${BUILD_ARGS:-}"
-CONTAINERS_DIR="$(dirname "${SQSH}")"
-MANIFEST="${MANIFEST:-${CONTAINERS_DIR}/manifest.yaml}"
-MANIFEST_KEY="${MANIFEST_KEY:-$(basename "${SQSH}" .sqsh)}"
 
 if [ ! -f "${DOCKERFILE}" ]; then
     echo "ERROR: Dockerfile not found: ${DOCKERFILE}" >&2
     exit 1
 fi
-mkdir -p "${CONTAINERS_DIR}" "${BUILD_CACHE_DIR}"
 
-# ------------------------------------------------------------------------------
-# 1. Install enroot at runtime. dnf5 on Fedora 41 crashes the *final* transaction
-# step (std::length_error in basic_string::_M_replace_aux) regardless of packages
-# — files land, then bookkeeping segfaults. Tolerate the non-zero exit and verify
-# binaries. Excluding ncurses keeps the dep set minimal (avoids
-# parallel -> perl-Term-Cap -> ncurses, which the import-from-podman path skips).
-# ------------------------------------------------------------------------------
-echo "[kit-build] installing enroot v${ENROOT_VERSION} runtime deps ..."
-set +e
-dnf install -y --quiet --exclude=ncurses jq squashfs-tools
-dnf_rc=$?
-set -e
-if ! command -v jq >/dev/null 2>&1 || ! command -v mksquashfs >/dev/null 2>&1; then
-    echo "[kit-build] dnf install actually failed (rc=${dnf_rc}); deps missing." >&2
-    exit 1
-fi
-echo "[kit-build] dnf install rc=${dnf_rc} (non-zero is the dnf5 finish bug; files installed)."
-
-echo "[kit-build] fetching + rpm --nodeps installing enroot ..."
-RPM_URL_BASE="https://github.com/NVIDIA/enroot/releases/download/v${ENROOT_VERSION}"
-mkdir -p /tmp/enroot-rpms
-curl -fsSL -o /tmp/enroot-rpms/enroot.rpm \
-    "${RPM_URL_BASE}/enroot-${ENROOT_VERSION}-1.el8.x86_64.rpm"
-curl -fsSL -o /tmp/enroot-rpms/enroot-caps.rpm \
-    "${RPM_URL_BASE}/enroot+caps-${ENROOT_VERSION}-1.el8.x86_64.rpm"
-rpm -i --nodeps /tmp/enroot-rpms/enroot.rpm /tmp/enroot-rpms/enroot-caps.rpm
-
-# ------------------------------------------------------------------------------
-# 2. Redirect enroot scratch to the mounted cache. enroot defaults to $HOME (a
-# small tmpfs inside the container) which fills during import of a multi-GB image.
-# ------------------------------------------------------------------------------
-export ENROOT_CACHE_PATH="${BUILD_CACHE_DIR}/enroot/cache"
-export ENROOT_DATA_PATH="${BUILD_CACHE_DIR}/enroot/data"
-export ENROOT_RUNTIME_PATH="${BUILD_CACHE_DIR}/enroot/runtime"
-export ENROOT_TEMP_PATH="${BUILD_CACHE_DIR}/enroot/tmp"
-mkdir -p "${ENROOT_CACHE_PATH}" "${ENROOT_DATA_PATH}" "${ENROOT_RUNTIME_PATH}" "${ENROOT_TEMP_PATH}"
-enroot version
-
-# ------------------------------------------------------------------------------
-# 3. Registry auth for the base image (FROM nvcr.io/...). Provide NGC_API_KEY, or
-# rely on the cluster's podman credentials / a cached base image.
-# ------------------------------------------------------------------------------
-if [ -n "${NGC_API_KEY:-}" ]; then
-    echo "[kit-build] podman login nvcr.io ..."
-    echo "${NGC_API_KEY}" | podman login nvcr.io --username '$oauthtoken' --password-stdin
+# Optional explicit login (otherwise rely on a mounted auth.json bridged from the
+# host enroot credentials).
+if [ -n "${REGISTRY_TOKEN:-}" ] && [ -n "${REGISTRY_HOST:-}" ]; then
+    echo "[kit-build] podman login ${REGISTRY_HOST} ..."
+    echo "${REGISTRY_TOKEN}" | podman login "${REGISTRY_HOST}" --username "${REGISTRY_USER:-oauth2}" --password-stdin
 fi
 
-# ------------------------------------------------------------------------------
-# 4. Build + 5. import.
-# ------------------------------------------------------------------------------
-echo "[kit-build] podman build -t ${IMAGE_TAG} ..."
+echo "[kit-build] podman build -t ${IMAGE_REF} ..."
 # shellcheck disable=SC2086  # BUILD_ARGS is an intentional word-split passthrough.
-podman build ${BUILD_ARGS} -f "${DOCKERFILE}" -t "${IMAGE_TAG}" "${CONTEXT}"
+podman build ${BUILD_ARGS} -f "${DOCKERFILE}" -t "${IMAGE_REF}" "${CONTEXT}"
 
-echo "[kit-build] enroot import podman://${IMAGE_TAG} -> ${SQSH}"
-rm -f "${SQSH}"
-enroot import --output "${SQSH}" "podman://${IMAGE_TAG}"
-ls -la "${SQSH}"
+echo "[kit-build] podman push ${IMAGE_REF} ..."
+podman push "${IMAGE_REF}"
 
-# ------------------------------------------------------------------------------
-# 6. Upsert the shared container manifest (idempotent: drop prior block, append).
-# `run` reads `container_image` from here; the local and air-gap backends emit
-# the same schema.
-# ------------------------------------------------------------------------------
-if [ ! -f "${SQSH}" ]; then
-    echo "ERROR: build reported success but ${SQSH} is missing." >&2
-    exit 1
-fi
-SHA256="$(sha256sum "${SQSH}" | awk '{print $1}')"
-BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-touch "${MANIFEST}"
-if grep -q "^${MANIFEST_KEY}:" "${MANIFEST}" 2>/dev/null; then
-    sed -i "/^${MANIFEST_KEY}:/,+3d" "${MANIFEST}"
-fi
-cat >> "${MANIFEST}" <<MANIFEST_EOF
-${MANIFEST_KEY}:
-  ref: ${SQSH}
-  sha256: ${SHA256}
-  built: ${BUILT_AT}
-MANIFEST_EOF
-
-echo "[kit-build] manifest updated: ${MANIFEST} (key: ${MANIFEST_KEY})"
-echo "[kit-build] run with:  ... run.env.container_image=${SQSH}"
-echo KIT_BUILD_DONE
+echo "[kit-build] pushed ${IMAGE_REF}"
+echo KIT_BUILD_PUSH_DONE

@@ -2,7 +2,7 @@ run:
   env:
     container: anyscale/ray:2.55.1-py312
 
-# Phase 2 (high-quality refinement, final ~5T tokens; minus-sqrt LR decay).
+# Phase 2 (high-quality refinement bias; minus-sqrt LR decay).
 
 # Path to data blend JSON file
 blend_path: ${oc.env:PWD}/src/nemotron/recipes/ultra3/stage0_pretrain/config/data_prep/data_blend_raw_phase2.json
@@ -20,9 +20,8 @@ valid_shards: 1
 test_shards: 1
 
 # Tokenizer configuration (nested)
-# TODO(ultra3): confirm the released Ultra tokenizer repo id on 2026-06-04.
 tokenizer:
-  model: nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-Base-BF16
+  model: nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16
   add_bos: false
   add_eos: true
 

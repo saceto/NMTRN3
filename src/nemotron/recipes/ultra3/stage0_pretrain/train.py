@@ -5,7 +5,7 @@
 # docs = "https://raw.githubusercontent.com/NVIDIA-NeMo/Nemotron/main/docs/runspec/v1/spec.md"
 # name = "ultra3/pretrain"
 # image = "/home/${oc.env:USER}/.cache/nemotron/containers/ultra3-pretrain.sqsh"
-# setup = "Build the Ultra3 pretrain container with `nemotron ultra3 build pretrain` before training."
+# setup = "Build the Ultra3 pretrain container with `nemotron kit slurm build <profile> --recipe ultra3 --stage pretrain` before training."
 #
 # [tool.runspec.run]
 # launch = "torchrun"

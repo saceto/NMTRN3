@@ -2,21 +2,18 @@
 FROM nvcr.io/nvidia/nemo:26.04.01
 
 # Ultra does not currently ship a released training container. This recipe
-# builds one on top of the published NeMo base image by cloning a pinned
-# Megatron-Bridge release branch. That branch pins its Megatron-LM submodule, so
-# no separate Megatron-Core branch is needed. Build via:
-#   nemotron kit slurm build <profile> --recipe ultra3 --stage pretrain \
-#       --build-arg MEGATRON_BRIDGE_BRANCH=dev-0603
-# Optionally override the submodule with --build-arg MEGATRON_CORE_BRANCH=<branch>.
+# builds one on top of the published NeMo base image by cloning the Ultra
+# Megatron-Bridge release branch (`nemotron_3_ultra`), which pins its
+# Megatron-LM submodule — so no separate Megatron-Core branch is needed. Build:
+#   nemotron kit slurm build <profile> --recipe ultra3 --stage pretrain
+# Override the branch/pin only if needed via --build-arg MEGATRON_BRIDGE_BRANCH=...
+# / --build-arg MEGATRON_CORE_BRANCH=...
 ARG MEGATRON_BRIDGE_REPO=https://github.com/NVIDIA-NeMo/Megatron-Bridge.git
-ARG MEGATRON_BRIDGE_BRANCH=<ultra-release-branch>
+ARG MEGATRON_BRIDGE_BRANCH=nemotron_3_ultra
 ARG MEGATRON_CORE_REPO=https://github.com/NVIDIA/Megatron-LM.git
 # Empty by default: trust the Megatron-LM commit pinned by the Megatron-Bridge
 # branch's submodule. Set only to override that pin.
 ARG MEGATRON_CORE_BRANCH=
-
-RUN test "${MEGATRON_BRIDGE_BRANCH}" != "<ultra-release-branch>" || \
-        (echo "Set MEGATRON_BRIDGE_BRANCH to the Ultra release branch with --build-arg." >&2; exit 1)
 
 # Use git clone rather than ADD <git-url>: BuildKit's ADD strips the .git
 # directory, which breaks submodule update/fetch operations. --recurse-submodules

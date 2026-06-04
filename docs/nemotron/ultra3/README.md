@@ -10,9 +10,9 @@ Pretraining and packed SFT support for Nemotron 3 Ultra through the Nemotron CLI
 
 - Slurm execution profile in `env.toml` (see [Execution through NeMo-Run](../../nemo_runspec/nemo-run.md))
 - A Ray-capable profile for `data prep` (tokenizes the open pretrain/SFT mixture)
-- SFT: the default config consumes an externally packed Ultra3 SFT data artifact; `openmath` remains the Megatron-Bridge OpenMathInstruct-2 fallback/demo config
+- SFT: the default config consumes an externally packed Ultra3 SFT data artifact
 - Training container images: build stage squashfs images from `nvcr.io/nvidia/nemo:26.04.01` with `nemotron kit slurm build`
-- Hugging Face model id/path: `nvidia/nemotron-ultra-rl-052726`
+- Hugging Face model id/path: `nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16`
 
 Example `env.toml` profile:
 
@@ -39,7 +39,7 @@ uv run nemotron ultra3 sft -c tiny --run YOUR-CLUSTER --dry-run
 | Stage | Purpose | Guide |
 |-------|---------|-------|
 | 0 | [Pretraining](./pretrain.md) | Data prep + pretraining with Megatron-Bridge |
-| 1 | [SFT](./sft.md) | Paper-style packed-Parquet SFT by default; OpenMathInstruct-2 fallback with Megatron-Bridge |
+| 1 | [SFT](./sft.md) | Paper-style packed-Parquet SFT with Megatron-Bridge |
 | 2 | [MOPD](./mopd.md) | RLVR + teacher panel + Multi-Teacher On-Policy Distillation with NeMo RL (GB200) |
 | 3 | [Quantization](./quantization.md) | NVFP4 post-training quantization for Blackwell |
 
@@ -87,6 +87,12 @@ The 1M-context LC phase is **not included** because its data (46% long-context d
 Super & Nano + synthetic long-context SFT-style data) is not open-source. See
 [pretrain.md](./pretrain.md#long-context-phase-not-included) for how to replicate it from the Phase 2
 checkpoint with your own long-context corpus.
+
+## Megatron-Bridge
+
+The pretrain and SFT stages wrap the Megatron-Bridge Ultra recipes. For direct execution and the
+upstream Slurm examples (conversion, inference, pretraining, packed SFT/PEFT), see the
+[Ultra examples on the `nemotron_3_ultra` branch](https://github.com/NVIDIA-NeMo/Megatron-Bridge/tree/nemotron_3_ultra/examples/models/nemotron/nemotron_3/ultra).
 
 ## Execution options
 

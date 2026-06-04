@@ -72,29 +72,40 @@ mounts = ["/lustre:/lustre"]
 
 ## Container images
 
-Ultra3 does **not** ship a released training container tag. Build the stage
-containers yourself before launching training:
+Ultra3 does **not** ship a released training container tag. The recipe stages
+own only a `Dockerfile`; build the squashfs images with the shared, Slurm-only
+`kit slurm build` command before launching training:
 
 ```bash
-uv run nemotron ultra3 build pretrain --run YOUR-CLUSTER --dry-run
-uv run nemotron ultra3 build sft --run YOUR-CLUSTER --dry-run
+uv run nemotron kit slurm build dlw --recipe ultra3 --stage pretrain
+uv run nemotron kit slurm build dlw --recipe ultra3 --stage sft
 ```
 
-The build command uses the same podman → enroot → squashfs pipeline as Omni3 and
-writes artifacts under `${build_cache_dir:-~/.cache/nemotron}/containers/`:
+`kit slurm build` is env.toml / nemo_runspec driven: it resolves the build
+partition, account, and cache dir from the named profile, ships the repo with
+CodePackager, and runs `podman build → enroot import` on a compute node (as root
+via `--container-remap-root` so the import can unpack). It writes artifacts under
+`${build_cache_dir:-~/.cache/nemotron}/containers/` plus a `manifest.yaml`:
 
 - `ultra3-pretrain.sqsh`
 - `ultra3-sft.sqsh`
 
-The Dockerfiles start from `nvcr.io/nvidia/nemo:26.04.01` and follow the Ultra
-Megatron-Bridge README's Day-0 code flow. That README currently leaves the MB and
-Megatron-LM branch names as placeholders, so pass the released branch values
-through podman args when building:
+Only `MEGATRON_BRIDGE_BRANCH` is required: the Dockerfiles start from
+`nvcr.io/nvidia/nemo:26.04.01` and `git clone --recurse-submodules` the MB
+branch, which **pins its Megatron-LM submodule** — so no separate Megatron-Core
+branch is needed (pass `--build-arg MEGATRON_CORE_BRANCH=<branch>` only to
+override the pin).
+
+### Transparent (no-CLI) path
+
+For a dependency-free build, each stage also ships `build.slurm.sh` — submit it
+with bare `sbatch` on a cluster-visible checkout. It launches the same shared
+`build_container.sh` the CLI runs:
 
 ```bash
-uv run nemotron ultra3 build pretrain --run YOUR-CLUSTER -- \
-  --build-arg MEGATRON_BRIDGE_BRANCH=<ultra-release-branch> \
-  --build-arg MEGATRON_CORE_BRANCH=<ultra-mcore-branch>
+sbatch --partition=<cpu-part> --account=<acct> \
+  src/nemotron/recipes/ultra3/build.slurm.sh pretrain   # or: sft
+# BUILD_ARGS="--build-arg MEGATRON_BRIDGE_BRANCH=nemotron_3_ultra" passed via env
 ```
 
 Training configs point at the resulting squashfs paths, for example
@@ -103,13 +114,9 @@ Training configs point at the resulting squashfs paths, for example
 ## Quick Start
 
 ```bash
-# Build the training containers first (replace branch placeholders with release values)
-uv run nemotron ultra3 build pretrain --run YOUR-CLUSTER -- \
-  --build-arg MEGATRON_BRIDGE_BRANCH=<ultra-release-branch> \
-  --build-arg MEGATRON_CORE_BRANCH=<ultra-mcore-branch>
-uv run nemotron ultra3 build sft --run YOUR-CLUSTER -- \
-  --build-arg MEGATRON_BRIDGE_BRANCH=<ultra-release-branch> \
-  --build-arg MEGATRON_CORE_BRANCH=<ultra-mcore-branch>
+# Build the training containers first (Slurm-only; builds the nemotron_3_ultra MB branch)
+uv run nemotron kit slurm build dlw --recipe ultra3 --stage pretrain
+uv run nemotron kit slurm build dlw --recipe ultra3 --stage sft
 
 # Stage 0: Data prep + Pretraining
 uv run nemotron ultra3 data prep pretrain --run YOUR-CLUSTER
@@ -142,8 +149,8 @@ uv run nemotron ultra3 data prep sft [-c <config>] [--run <profile>] [--sample N
 ### Container Build
 
 ```bash
-uv run nemotron ultra3 build pretrain [--run <profile>] [--dry-run] [-- <podman args>]
-uv run nemotron ultra3 build sft      [--run <profile>] [--dry-run] [-- <podman args>]
+uv run nemotron kit slurm build <profile> --recipe ultra3 --stage pretrain [--dry-run] [--build-arg K=V]
+uv run nemotron kit slurm build <profile> --recipe ultra3 --stage sft      [--dry-run] [--build-arg K=V]
 ```
 
 ### Training

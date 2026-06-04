@@ -2,10 +2,11 @@ run:
   env:
     container: anyscale/ray:2.55.1-py312
 
-# Default Ultra3 pretrain config — Phase 1 (diversity, ~15T of the 20T horizon).
+# Default Ultra3 pretrain config — Phase 1 (diversity bias). The open blend is a
+# released subset of the paper's full phase-1 corpus, not the paper's ~15T.
 # Two-phase curriculum:
-#   nemotron ultra3 data prep pretrain --config phase1   # diversity (~15T)
-#   nemotron ultra3 data prep pretrain --config phase2   # refinement (~5T)
+#   nemotron ultra3 data prep pretrain --config phase1   # diversity mix (paper phase 1)
+#   nemotron ultra3 data prep pretrain --config phase2   # refinement mix (paper phase 2)
 
 # Path to data blend JSON file
 blend_path: ${oc.env:PWD}/src/nemotron/recipes/ultra3/stage0_pretrain/config/data_prep/data_blend_raw_phase1.json
@@ -23,9 +24,8 @@ valid_shards: 1
 test_shards: 1
 
 # Tokenizer configuration (nested)
-# TODO(ultra3): confirm the released Ultra tokenizer repo id on 2026-06-04.
 tokenizer:
-  model: nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-Base-BF16
+  model: nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16
   add_bos: false
   add_eos: true
 

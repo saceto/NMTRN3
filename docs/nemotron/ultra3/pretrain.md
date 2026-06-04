@@ -14,9 +14,30 @@ megatron.bridge.recipes.nemotronh.nemotron_3_ultra.nemotron_3_ultra_pretrain_con
 | Runspec name | `ultra3/pretrain` |
 | Launch | `torchrun` |
 | Container | `~/.cache/nemotron/containers/ultra3-pretrain.sqsh` (built from `nvcr.io/nvidia/nemo:26.04.01`) |
-| HF model id | `nvidia/nemotron-ultra-rl-052726` |
+| HF model id | `nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16` |
 | Default resources | 96 nodes × 8 GPUs |
 | Default parallelism | TP=2, PP=12, EP=32, ETP=1, CP=1 |
+
+## Container build
+
+Ultra3 ships no released training container — the stage owns a `Dockerfile` that
+builds the `nemotron_3_ultra` Megatron-Bridge branch on `nvcr.io/nvidia/nemo:26.04.01`.
+Build it before training.
+
+On Slurm (our CLI builds only on Slurm):
+
+```bash
+uv run nemotron kit slurm build <profile> --recipe ultra3 --stage pretrain
+```
+
+Or build the Dockerfile directly with Docker on any host:
+
+```bash
+docker build -t ultra3-pretrain src/nemotron/recipes/ultra3/stage0_pretrain
+```
+
+The train configs/runspec expect the squashfs at
+`${build_cache_dir:-~/.cache/nemotron}/containers/ultra3-pretrain.sqsh`.
 
 ## Data
 
@@ -26,8 +47,8 @@ Pretraining consumes the tokenized output of `nemotron ultra3 data prep pretrain
 that tokenizes the open pretrain mixture to Megatron `bin/idx`), the same flow super3/nano3 use:
 
 ```bash
-uv run nemotron ultra3 data prep pretrain -c phase1 --run YOUR-RAY-CLUSTER   # diversity (~15T)
-uv run nemotron ultra3 data prep pretrain -c phase2 --run YOUR-RAY-CLUSTER   # quality (~5T)
+uv run nemotron ultra3 data prep pretrain -c phase1 --run YOUR-RAY-CLUSTER   # diversity mix (paper phase 1)
+uv run nemotron ultra3 data prep pretrain -c phase2 --run YOUR-RAY-CLUSTER   # quality mix (paper phase 2)
 ```
 
 The blends (`config/data_prep/data_blend_raw_{phase1,phase2}.json`) encode the two-phase Figure 4
@@ -49,8 +70,6 @@ uv run nemotron ultra3 pretrain --run YOUR-CLUSTER
 
 SLURM execution comes from the shared `nemo_runspec` CLI machinery. `src/nemotron/cli/commands/ultra3/pretrain.py` parses the PEP-723 runspec header in `train.py`, merges YAML config with the `env.toml` profile, packages the script/config with `SelfContainedPackager`, and submits through NeMo-Run's Slurm executor for `--run` / `--batch`.
 
-No separate training `sbatch` script is required in this repo. Container builds use the shared `nemotron kit slurm build <profile> --recipe ultra3 --stage pretrain` path (or the fallback `src/nemotron/recipes/ultra3/build.slurm.sh`).
-
 ## Long-context phase (not included)
 
 The report's Long-Context (LC) phase extends Ultra to 1M-token context, but **this recipe does not
@@ -70,8 +89,30 @@ the Phase 2 checkpoint:
 - Parallelism (GB200): CP=32, TP=8, EP=128, PP=2.
 - Do not include RULER-style data.
 
+## Direct execution (Megatron-Bridge)
+
+This recipe wraps the Megatron-Bridge Ultra recipe
+(`megatron.bridge.recipes.nemotronh.nemotron_3_ultra.nemotron_3_ultra_pretrain_config`). To run it
+directly outside this CLI, use the example scripts in the
+[Megatron-Bridge `nemotron_3_ultra` branch](https://github.com/NVIDIA-NeMo/Megatron-Bridge/tree/nemotron_3_ultra/examples/models/nemotron/nemotron_3/ultra):
+
+```bash
+# Clone the repository and checkout the nemotron_3_ultra branch
+git clone https://github.com/NVIDIA-NeMo/Megatron-Bridge.git
+cd Megatron-Bridge
+git checkout nemotron_3_ultra
+
+# DCLM pretraining (TP=2 PP=12 EP=32); set DCLM_DATA_DIR to preprocessed bin/idx
+sbatch examples/models/nemotron/nemotron_3/ultra/slurm_pretrain.sh
+```
+
+See the
+[Ultra examples README](https://github.com/NVIDIA-NeMo/Megatron-Bridge/blob/nemotron_3_ultra/examples/models/nemotron/nemotron_3/ultra/README.md)
+for conversion, inference, and the full set of Slurm scripts.
+
 ## Source
 
 - Recipe: `src/nemotron/recipes/ultra3/stage0_pretrain/`
 - CLI: `src/nemotron/cli/commands/ultra3/pretrain.py`
+- Megatron-Bridge: [Ultra examples (`nemotron_3_ultra` branch)](https://github.com/NVIDIA-NeMo/Megatron-Bridge/tree/nemotron_3_ultra/examples/models/nemotron/nemotron_3/ultra)
 - Back to [Ultra3 overview](./README.md)

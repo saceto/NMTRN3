@@ -19,7 +19,7 @@ run:
 
 recipe:
   _target_: megatron.bridge.recipes.nemotronh.nemotron_3_ultra.nemotron_3_ultra_pretrain_config
-  hf_path: nvidia/nemotron-ultra-rl-052726
+  hf_path: nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16
   seq_length: 8192
 
 mixed_precision: nemotron_3_ultra_bf16_with_nvfp4_mixed
