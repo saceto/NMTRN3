@@ -2,7 +2,8 @@
 
 This guide serves **NVIDIA Nemotron 3 Ultra** on a single GB300-based
 [DGX Station](https://www.nvidia.com/en-us/products/workstations/dgx-station/)
-with [vLLM](https://docs.vllm.ai/). The result is an OpenAI-compatible API on
+with [vLLM](https://docs.vllm.ai/) 0.22.0. The recommended container image is
+`vllm/vllm-openai:v0.22.0`. The result is an OpenAI-compatible API on
 port 8000.
 
 Unlike the [four-node DGX Spark deployment](../SparkDeploymentGuide/README.md),
@@ -15,8 +16,9 @@ weights into the DGX Station's coherent CPU memory.
   system combines GPU HBM and CPU LPDDR5X in a coherent memory space over
   NVLink-C2C; see the
   [DGX Station Development Guide](https://docs.nvidia.com/dgx/dgx-station-development-guide/Intro.html).
-- A recent vLLM installation that supports `--cpu-offload-params`,
-  `--kernel_config`, and the `flashinfer-trtllm` NVFP4 GEMM backend.
+- vLLM 0.22.0. The recommended image is `vllm/vllm-openai:v0.22.0`;
+  it supports `--cpu-offload-params`, `--kernel_config`, and the
+  `flashinfer-trtllm` NVFP4 GEMM backend used below.
 - Access to
   [`nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4`](https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4)
   on Hugging Face and enough local storage for the model weights.
@@ -91,8 +93,8 @@ network access to the service if it is reachable beyond the local machine.
 ## Troubleshooting
 
 - **vLLM rejects an option or backend:** update the DGX Station software stack
-  or vLLM installation to a build that supports the offload and kernel settings
-  used above.
+  and use the recommended `vllm/vllm-openai:v0.22.0` image, which supports the
+  offload and kernel settings used above.
 - **The model download is denied:** accept the model terms on Hugging Face and
   authenticate with `hf auth login`.
 - **The model runs out of memory while loading:** stop other GPU workloads and
