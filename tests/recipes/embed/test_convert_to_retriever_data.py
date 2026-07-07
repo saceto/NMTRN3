@@ -69,27 +69,16 @@ def test_train_val_test_split_orders_files_before_seeded_shuffle():
 
 
 def test_single_doc_identifier_preserves_full_normalized_path():
-    dotted_source = (
-        "researchnvidiacom/"
-        "research.nvidia.com_publication_2022-11_document-one"
-    )
+    dotted_source = "researchnvidiacom/research.nvidia.com_publication_2022-11_document-one"
 
     assert get_file_identifier([dotted_source]) == dotted_source
     assert get_file_identifier(["./" + dotted_source]) == dotted_source
-    assert get_file_identifier(["corporateblog/60007"]) != get_file_identifier(
-        ["techblog/60007"]
-    )
+    assert get_file_identifier(["corporateblog/60007"]) != get_file_identifier(["techblog/60007"])
 
 
 def test_eval_qrels_do_not_collide_for_dotted_source_identifiers(tmp_path):
-    first_source = (
-        "researchnvidiacom/"
-        "research.nvidia.com_publication_2015-03_document-one"
-    )
-    second_source = (
-        "researchnvidiacom/"
-        "research.nvidia.com_publication_2016-04_document-two"
-    )
+    first_source = "researchnvidiacom/research.nvidia.com_publication_2015-03_document-one"
+    second_source = "researchnvidiacom/research.nvidia.com_publication_2016-04_document-two"
     generated_df = pd.DataFrame(
         [
             {
@@ -122,18 +111,12 @@ def test_eval_qrels_do_not_collide_for_dotted_source_identifiers(tmp_path):
 
     corpus_by_id = {
         record["_id"]: record["text"]
-        for record in (
-            json.loads(line)
-            for line in (tmp_path / "eval_beir" / "corpus.jsonl").read_text().splitlines()
-        )
+        for record in (json.loads(line) for line in (tmp_path / "eval_beir" / "corpus.jsonl").read_text().splitlines())
     }
     qrels = {
         query_id: corpus_by_id[corpus_id]
         for query_id, corpus_id, _ in (
-            line.split("\t")
-            for line in (tmp_path / "eval_beir" / "qrels" / "test.tsv")
-            .read_text()
-            .splitlines()[1:]
+            line.split("\t") for line in (tmp_path / "eval_beir" / "qrels" / "test.tsv").read_text().splitlines()[1:]
         )
     }
 
