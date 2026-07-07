@@ -281,6 +281,19 @@ def get_file_identifier(file_name_list: List[str]) -> str:
     return hashlib.md5("||".join(sorted(file_name_list)).encode()).hexdigest()[:16]
 
 
+def load_json_or_jsonl_records(json_file: str) -> List[Dict[str, Any]]:
+    """Load a JSON object, JSON array, or JSONL file into a list of records."""
+    with open(json_file, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    try:
+        records = json.loads(content)
+    except json.JSONDecodeError:
+        return [json.loads(line) for line in content.splitlines() if line.strip()]
+
+    return records if isinstance(records, list) else [records]
+
+
 def load_generated_json_files(input_path: str) -> pd.DataFrame:
     """
     Load generated JSON data from either a single file or a folder of batch files.
@@ -299,21 +312,7 @@ def load_generated_json_files(input_path: str) -> pd.DataFrame:
     if os.path.isfile(input_path):
         # Single file mode (merged JSON)
         print(f"Loading single JSON file: {input_path}")
-        with open(input_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        try:
-            records = json.loads(content)
-        except json.JSONDecodeError:
-            # JSONL: one JSON object per line
-            for line in content.splitlines():
-                line = line.strip()
-                if line:
-                    all_records.append(json.loads(line))
-        else:
-            if isinstance(records, list):
-                all_records.extend(records)
-            else:
-                all_records.append(records)
+        all_records.extend(load_json_or_jsonl_records(input_path))
     else:
         # Folder mode (batch files)
         json_files = sorted(glob.glob(os.path.join(input_path, 'generated_batch*.json')))
@@ -325,15 +324,10 @@ def load_generated_json_files(input_path: str) -> pd.DataFrame:
             raise ValueError(f"No JSON files found in {input_path}")
         
         print(f"Found {len(json_files)} JSON files")
-        
+
         for json_file in json_files:
             print(f"  Loading: {json_file}")
-            with open(json_file, 'r', encoding='utf-8') as f:
-                records = json.load(f)
-                if isinstance(records, list):
-                    all_records.extend(records)
-                else:
-                    all_records.append(records)
+            all_records.extend(load_json_or_jsonl_records(json_file))
     
     # Normalize file_name to list format (backward compat for old string format)
     print("Normalizing file_name fields...")
@@ -944,4 +938,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
