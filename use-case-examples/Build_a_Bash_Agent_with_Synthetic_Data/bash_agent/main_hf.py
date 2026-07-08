@@ -1,196 +1,263 @@
 #!/usr/bin/env python3
-"""
-Bash Computer Use Agent - HuggingFace Implementation
+"""Interactive runtime for the trained LangGraph CLI agent."""
 
-This is the main entry point for running the bash agent with local
-HuggingFace model inference. Uses the trained model checkpoint from
-unsloth_grpo_training.ipynb.
-
-Aligned with NVIDIA GenerativeAIExamples bash_computer_use_agent/main_from_scratch.py
-
-Usage:
-    python main_hf.py
-    python main_hf.py --model-path /path/to/model
-    python main_hf.py --use-api  # Use OpenAI-compatible API instead
-"""
+from __future__ import annotations
 
 import argparse
 import json
-import os
-import sys
+import math
+import re
+import shlex
+from pathlib import Path
+from typing import Any, Callable, Mapping, Optional, Sequence
 
-# Add the current directory to sys.path for imports
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from config import Config
-from bash import Bash
-from helpers import Messages, get_llm
-
-
-def confirm_execution(cmd: str) -> bool:
-    """Ask the user whether the suggested command should be executed."""
-    response = input(f"    Execute '{cmd}'? [y/N]: ").strip().lower()
-    return response == "y" or response == "yes"
+from .bash import Bash
+from .commands import CommandValidationError, LangGraphInvocation
+from .config import Config
+from .helpers import Messages, get_llm
 
 
-def main(config: Config):
-    """Main agent loop."""
-    # Initialize the bash tool
-    bash = Bash(config)
+def format_argv(argv: tuple[str, ...]) -> str:
+    """Format argv for humans only; this string is never executed."""
+    return shlex.join(argv)
 
-    # Initialize the LLM (HuggingFace or API based on config)
+
+def confirm_execution(argv: tuple[str, ...]) -> bool:
+    """Ask the user whether the exact validated argv should be executed."""
+    response = input(f"    Execute {format_argv(argv)!r}? [y/N]: ").strip().lower()
+    return response in {"y", "yes"}
+
+
+def execute_with_confirmation(
+    executor: Bash,
+    invocation: LangGraphInvocation,
+    confirm: Callable[[tuple[str, ...]], bool] = confirm_execution,
+) -> dict[str, Any]:
+    """Execute only after a human approves the same immutable argv."""
+    if not confirm(invocation.argv):
+        return {"error": "The user declined the execution of this command."}
+    return executor.exec_langgraph(invocation)
+
+
+def _tool_call_parts(tool_call: Any) -> tuple[str, str, str]:
+    if isinstance(tool_call, Mapping):
+        tool_id = tool_call.get("id")
+        function = tool_call.get("function")
+    else:
+        tool_id = getattr(tool_call, "id", None)
+        function = getattr(tool_call, "function", None)
+
+    if isinstance(function, Mapping):
+        name = function.get("name")
+        arguments = function.get("arguments")
+    else:
+        name = getattr(function, "name", None)
+        arguments = getattr(function, "arguments", None)
+    if not all(isinstance(value, str) and value for value in (tool_id, name, arguments)):
+        raise ValueError("Malformed function tool call.")
+    return tool_id, name, arguments
+
+
+def _tool_call_id(tool_call: Any) -> str:
+    if isinstance(tool_call, Mapping):
+        tool_id = tool_call.get("id")
+    else:
+        tool_id = getattr(tool_call, "id", None)
+    return tool_id if isinstance(tool_id, str) and tool_id else "call_invalid"
+
+
+def _display_tool_result(result: Mapping[str, Any]) -> None:
+    if result.get("stdout"):
+        print(f"\nOutput:\n{result['stdout']}")
+    if result.get("stderr"):
+        print(f"\nError:\n{result['stderr']}")
+    if result.get("error"):
+        print(f"\nError:\n{result['error']}")
+
+
+def _without_thinking(response: str) -> str:
+    return response.split("</think>")[-1].strip()
+
+
+def existing_directory(value: str) -> str:
+    """Resolve an argparse value and require an existing directory."""
+    path = Path(value).expanduser().resolve()
+    if not path.is_dir():
+        raise argparse.ArgumentTypeError(f"not an existing directory: {value!r}")
+    return str(path)
+
+
+def positive_seconds(value: str) -> float:
+    """Parse a finite, positive duration for argparse."""
+    try:
+        seconds = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be a number of seconds") from exc
+    if not math.isfinite(seconds) or seconds <= 0:
+        raise argparse.ArgumentTypeError("must be a finite number greater than zero")
+    return seconds
+
+
+def environment_name(value: str) -> str:
+    """Validate an environment variable name passed through to child commands."""
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", value):
+        raise argparse.ArgumentTypeError(f"invalid environment variable name: {value!r}")
+    return value
+
+
+def main(config: Config) -> None:
+    executor = Bash(config)
+    try:
+        _run_agent(config, executor)
+    finally:
+        executor.close()
+
+
+def _run_agent(config: Config, executor: Bash) -> None:
     llm = get_llm(config)
-
-    # Initialize conversation with system prompt
-    messages = Messages(config.system_prompt)
+    messages = Messages(config.json_system_prompt)
 
     print("\n" + "=" * 60)
-    print("Bash Computer Use Agent")
+    print("LangGraph CLI Agent")
     print("=" * 60)
-    print(f"Model: {config.model_path}")
-    print(f"Working directory: {bash.cwd}")
-    print("Type 'quit' or 'exit' to stop.")
+    if config.use_api:
+        print(f"Model: {config.api_model_name} at {config.api_base_url}")
+    else:
+        print(f"Model: {config.model_path}")
+    print(f"Working directory: {executor.cwd}")
+    print("Type 'quit' or 'exit' to stop; type 'clear' to reset history.")
     print("=" * 60 + "\n")
 
-    # The main agent loop
     while True:
-        # Get user message
         try:
-            user = input(f"['{bash.cwd}'] > ").strip()
+            user = input(f"['{executor.cwd}'] > ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\n\nShutting down. Bye!")
             break
 
-        if user.lower() in ["quit", "exit"]:
+        if user.lower() in {"quit", "exit"}:
             print("\nShutting down. Bye!")
             break
-
+        if user.lower() == "clear":
+            messages.clear()
+            print("Conversation cleared.\n")
+            continue
         if not user:
             continue
 
-        # Always tell the agent where the current working directory is
-        user_with_context = f"{user}\nCurrent working directory: `{bash.cwd}`"
-        messages.add_user_message(user_with_context)
+        messages.add_user_message(user)
 
-        # The tool-call/response loop
         while True:
             print("\nThinking...")
-
             try:
-                response, tool_calls = llm.query(messages, [bash.to_json_schema()])
-            except Exception as e:
-                print(f"Error querying model: {e}")
+                raw_response, tool_calls = llm.query(messages, [executor.to_json_schema()])
+            except Exception as exc:
+                print(f"Error querying model: {exc}")
                 break
 
-            if response:
-                response = response.strip()
-
-                # Remove thinking tags if present (for models that use them)
-                if "</think>" in response:
-                    response = response.split("</think>")[-1].strip()
-
-                # Add non-empty response to context
-                if response:
-                    messages.add_assistant_message(response)
-
-            # Process tool calls
+            display_response = _without_thinking(raw_response)
             if tool_calls:
-                for tc in tool_calls:
-                    # Handle different tool call formats
-                    if hasattr(tc, "function"):
-                        # OpenAI API format
-                        function_name = tc.function.name
-                        function_args = json.loads(tc.function.arguments)
-                        tool_id = tc.id
-                    else:
-                        # Dict format from HuggingFace parser
-                        function_name = tc["function"]["name"]
-                        function_args = json.loads(tc["function"]["arguments"])
-                        tool_id = tc["id"]
+                # Chat Completions requires this assistant message immediately before
+                # the corresponding role=tool messages.
+                messages.add_assistant_tool_calls(raw_response or None, tool_calls)
+            elif raw_response:
+                messages.add_assistant_message(raw_response)
 
-                    # Ensure it's calling the right tool
-                    if function_name != "exec_bash_command" or "cmd" not in function_args:
-                        tool_call_result = {"error": "Incorrect tool or function argument"}
-                    else:
-                        command = function_args["cmd"]
-                        print(f"\nProposed command: {command}")
-
-                        # Confirm execution with the user
-                        if confirm_execution(command):
-                            tool_call_result = bash.exec_bash_command(command)
-
-                            # Display output
-                            if tool_call_result.get("stdout"):
-                                print(f"\nOutput:\n{tool_call_result['stdout']}")
-                            if tool_call_result.get("stderr"):
-                                print(f"\nError:\n{tool_call_result['stderr']}")
-                            if tool_call_result.get("error"):
-                                print(f"\nError:\n{tool_call_result['error']}")
-                        else:
-                            tool_call_result = {"error": "The user declined the execution of this command."}
-
-                    messages.add_tool_message(json.dumps(tool_call_result), tool_id)
-            else:
-                # No tool calls - display the assistant's message to the user
-                if response:
-                    print(f"\n{response}")
+            if not tool_calls:
+                if display_response:
+                    print(f"\n{display_response}")
                     print("-" * 60)
                 break
 
+            for tool_call in tool_calls:
+                tool_id = _tool_call_id(tool_call)
+                try:
+                    tool_id, function_name, raw_arguments = _tool_call_parts(tool_call)
+                    arguments = json.loads(raw_arguments)
+                    if (
+                        function_name != "run_langgraph"
+                        or not isinstance(arguments, dict)
+                        or set(arguments) != {"argv"}
+                    ):
+                        raise CommandValidationError(
+                            "Expected run_langgraph with exactly one 'argv' field."
+                        )
+                    invocation = executor.prepare_argv(arguments["argv"])
+                except (CommandValidationError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                    tool_result: dict[str, Any] = {"error": str(exc)}
+                else:
+                    print(f"\nProposed command: {format_argv(invocation.argv)}")
+                    tool_result = execute_with_confirmation(executor, invocation)
 
-def parse_args():
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(
-        description="Bash Computer Use Agent with HuggingFace inference"
-    )
+                _display_tool_result(tool_result)
+                messages.add_tool_message(json.dumps(tool_result), tool_id)
+
+
+def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="LangGraph CLI agent runtime")
+    parser.add_argument("--model-path", help="Local trained model checkpoint")
+    parser.add_argument("--use-api", action="store_true", help="Use an OpenAI-compatible API")
+    parser.add_argument("--api-url", default=None, help="OpenAI-compatible API base URL")
+    parser.add_argument("--api-model", default=None, help="Served API model name")
     parser.add_argument(
-        "--model-path",
-        type=str,
-        default=None,
-        help="Path to the model checkpoint (default: outputs/grpo_langgraph_cli/merged_model)"
-    )
-    parser.add_argument(
-        "--use-api",
+        "--omit-api-thinking-override",
         action="store_true",
-        help="Use OpenAI-compatible API instead of local inference"
+        help=(
+            "Do not send vLLM's chat_template_kwargs reasoning override; "
+            "configure reasoning-off at the server instead"
+        ),
+    )
+    parser.add_argument("--temperature", type=float, default=None)
+    parser.add_argument("--device", default=None, help="cuda, cpu, mps, or auto")
+    parser.add_argument(
+        "--root-dir",
+        type=existing_directory,
+        default=None,
+        help="Existing trusted directory used as the command cwd and path boundary",
     )
     parser.add_argument(
-        "--api-url",
-        type=str,
-        default="http://localhost:8000/v1",
-        help="API base URL when using --use-api"
+        "--command-timeout",
+        type=positive_seconds,
+        default=None,
+        metavar="SECONDS",
+        help="Timeout for finite LangGraph commands (default: 600 seconds)",
     )
     parser.add_argument(
-        "--temperature",
-        type=float,
-        default=0.1,
-        help="Sampling temperature (default: 0.1)"
+        "--pass-env",
+        action="append",
+        type=environment_name,
+        default=None,
+        metavar="NAME",
+        help="Allow one environment variable in child commands; repeat as needed",
     )
-    parser.add_argument(
-        "--device",
-        type=str,
-        default="cuda",
-        help="Device to run on (default: cuda)"
-    )
-    return parser.parse_args()
+    return parser.parse_args(argv)
+
+
+def config_from_args(args: argparse.Namespace) -> Config:
+    """Apply validated CLI arguments before the runtime is initialized."""
+    runtime_config = Config()
+    if args.model_path is not None:
+        runtime_config.model_path = args.model_path
+    if args.use_api:
+        runtime_config.use_api = True
+    if args.api_url is not None:
+        runtime_config.api_base_url = args.api_url
+    if args.api_model is not None:
+        runtime_config.api_model_name = args.api_model
+    if args.omit_api_thinking_override:
+        runtime_config.api_send_thinking_override = False
+    if args.temperature is not None:
+        runtime_config.temperature = args.temperature
+    if args.device is not None:
+        runtime_config.device = args.device
+    if args.root_dir is not None:
+        runtime_config.root_dir = args.root_dir
+    if args.command_timeout is not None:
+        runtime_config.command_timeout_seconds = args.command_timeout
+    if args.pass_env is not None:
+        runtime_config.pass_environment.update(args.pass_env)
+    return runtime_config
 
 
 if __name__ == "__main__":
-    args = parse_args()
-
-    # Create configuration
-    config = Config()
-
-    # Override with command line arguments
-    if args.model_path:
-        config.model_path = args.model_path
-    if args.use_api:
-        config.use_api = True
-        config.api_base_url = args.api_url
-    if args.temperature:
-        config.temperature = args.temperature
-    if args.device:
-        config.device = args.device
-
-    # Run the agent
-    main(config)
+    main(config_from_args(parse_args()))

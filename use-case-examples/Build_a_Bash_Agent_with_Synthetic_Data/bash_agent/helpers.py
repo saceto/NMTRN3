@@ -1,75 +1,168 @@
-"""
-Helper classes for message handling and LLM inference.
+"""Conversation and inference helpers for the LangGraph CLI agent."""
 
-Aligned with NVIDIA GenerativeAIExamples bash_computer_use_agent/helpers.py
-with added HuggingFace local inference support.
-"""
+from __future__ import annotations
 
-from typing import Any, Dict, List, Tuple, Optional
 import json
-import re
+from typing import Any, Mapping, Optional
 
-from config import Config
+from .commands import (
+    CommandValidationError,
+    LangGraphInvocation,
+    invocation_from_argv,
+    invocation_from_payload,
+)
+from .config import Config
+
+
+def _serialize_tool_call(tool_call: Any) -> dict[str, Any]:
+    if hasattr(tool_call, "model_dump"):
+        serialized = tool_call.model_dump(exclude_none=True)
+    elif isinstance(tool_call, Mapping):
+        serialized = dict(tool_call)
+    else:
+        raise TypeError("Tool calls must be mappings or OpenAI SDK model objects.")
+
+    function = serialized.get("function")
+    if hasattr(function, "model_dump"):
+        serialized["function"] = function.model_dump(exclude_none=True)
+    if "type" not in serialized and "function" in serialized:
+        serialized["type"] = "function"
+    return serialized
 
 
 class Messages:
-    """
-    An abstraction for a list of system/user/assistant/tool messages.
-
-    Compatible with both OpenAI API format and HuggingFace chat templates.
-    """
+    """Conversation history compatible with Chat Completions and local chat templates."""
 
     def __init__(self, system_message: str = ""):
-        self.system_message = None
-        self.messages = []
-        self.set_system_message(system_message)
+        self.system_message: dict[str, Any] = {
+            "role": "system",
+            "content": system_message,
+        }
+        self.messages: list[dict[str, Any]] = []
 
-    def set_system_message(self, message: str):
-        """Set the system message."""
+    def set_system_message(self, message: str) -> None:
         self.system_message = {"role": "system", "content": message}
 
-    def add_user_message(self, message: str):
-        """Add a user message to the conversation."""
+    def clear(self) -> None:
+        """Clear the turn history while retaining the system prompt."""
+        self.messages.clear()
+
+    def add_user_message(self, message: str) -> None:
         self.messages.append({"role": "user", "content": message})
 
-    def add_assistant_message(self, message: str):
-        """Add an assistant message to the conversation."""
+    def add_assistant_message(self, message: str) -> None:
         self.messages.append({"role": "assistant", "content": message})
 
-    def add_tool_message(self, message: Any, id: str):
-        """Add a tool response message."""
-        self.messages.append({
-            "role": "tool",
-            "content": str(message) if not isinstance(message, str) else message,
-            "tool_call_id": id
-        })
+    def add_assistant_tool_calls(self, content: Optional[str], tool_calls: list[Any]) -> None:
+        """Record the assistant call before its tool-result messages."""
+        self.messages.append(
+            {
+                "role": "assistant",
+                "content": content or None,
+                "tool_calls": [_serialize_tool_call(call) for call in tool_calls],
+            }
+        )
 
-    def to_list(self) -> List[Dict[str, str]]:
-        """Convert to a list of messages for API calls."""
-        return [self.system_message] + self.messages
+    def add_tool_message(self, message: Any, id: str) -> None:
+        self.messages.append(
+            {
+                "role": "tool",
+                "content": message if isinstance(message, str) else str(message),
+                "tool_call_id": id,
+            }
+        )
 
-    def to_chat_format(self) -> List[Dict[str, str]]:
-        """Convert to HuggingFace chat format (without tool_call_id)."""
-        result = [self.system_message]
-        for msg in self.messages:
-            # For tool messages, convert to user message format for HF
-            if msg.get("role") == "tool":
-                result.append({
-                    "role": "user",
-                    "content": f"Tool result: {msg['content']}"
-                })
+    def to_list(self) -> list[dict[str, Any]]:
+        return [self.system_message, *self.messages]
+
+    def to_chat_format(self) -> list[dict[str, str]]:
+        """Convert API tool messages to text turns understood by the fine-tuned model."""
+        result: list[dict[str, str]] = [
+            {"role": "system", "content": str(self.system_message["content"])}
+        ]
+        for message in self.messages:
+            role = message.get("role")
+            if role == "tool":
+                result.append({"role": "user", "content": f"Tool result: {message['content']}"})
+            elif role == "assistant" and message.get("tool_calls"):
+                content = message.get("content")
+                if not content:
+                    first_call = message["tool_calls"][0]
+                    content = first_call.get("function", {}).get("arguments", "")
+                result.append({"role": "assistant", "content": str(content)})
             else:
-                result.append({"role": msg["role"], "content": msg["content"]})
+                result.append({"role": str(role), "content": str(message.get("content", ""))})
         return result
 
 
-class HuggingFaceLLM:
-    """
-    LLM wrapper for local HuggingFace model inference.
+def _extract_json_object(response: str) -> Optional[dict[str, Any]]:
+    clean_response = response.split("</think>")[-1].strip()
+    try:
+        parsed = json.loads(clean_response)
+    except json.JSONDecodeError:
+        decoder = json.JSONDecoder()
+        parsed = None
+        for index, character in enumerate(clean_response):
+            if character != "{":
+                continue
+            try:
+                candidate, _ = decoder.raw_decode(clean_response[index:])
+            except json.JSONDecodeError:
+                continue
+            if isinstance(candidate, dict):
+                parsed = candidate
+                break
+    return parsed if isinstance(parsed, dict) else None
 
-    Loads the trained model from the checkpoint and provides
-    a query interface compatible with the agent loop.
-    """
+
+def _tool_call_for(invocation: LangGraphInvocation) -> dict[str, Any]:
+    return {
+        "id": "call_local_0",
+        "type": "function",
+        "function": {
+            "name": "run_langgraph",
+            "arguments": json.dumps({"argv": list(invocation.argv)}),
+        },
+    }
+
+
+def parse_model_tool_calls(response: str, root_dir: str) -> list[dict[str, Any]]:
+    """Parse either trained structured output or an explicit argv object."""
+    parsed = _extract_json_object(response)
+    if parsed is None:
+        return []
+    try:
+        if "argv" in parsed:
+            invocation = invocation_from_argv(parsed["argv"], root_dir)
+        else:
+            invocation = invocation_from_payload(parsed, root_dir)
+    except CommandValidationError:
+        return []
+    return [_tool_call_for(invocation)]
+
+
+def _model_load_settings(config: Config, torch: Any) -> tuple[Any, Any]:
+    """Select a supported inference dtype and an explicit device map."""
+    if config.device == "auto":
+        return "auto", "auto"
+
+    device = torch.device(config.device)
+    if device.type == "cuda":
+        if not torch.cuda.is_available():
+            raise RuntimeError("CUDA was requested, but no CUDA device is available.")
+        supports_bf16 = getattr(torch.cuda, "is_bf16_supported", lambda: False)()
+        dtype = torch.bfloat16 if supports_bf16 else torch.float16
+    elif device.type == "mps":
+        if not torch.backends.mps.is_available():
+            raise RuntimeError("MPS was requested, but no MPS device is available.")
+        dtype = torch.float16
+    else:
+        dtype = torch.float32
+    return dtype, {"": str(device)}
+
+
+class HuggingFaceLLM:
+    """Local Transformers inference wrapper for the trained checkpoint."""
 
     def __init__(self, config: Config):
         self.config = config
@@ -77,291 +170,119 @@ class HuggingFaceLLM:
         self.tokenizer = None
         self._load_model()
 
-    def _load_model(self):
-        """Load the model and tokenizer from the checkpoint."""
+    def _load_model(self) -> None:
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
         print(f"Loading model from: {self.config.model_path}")
-
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.config.model_path,
-            trust_remote_code=True,
+            trust_remote_code=False,
         )
-
+        dtype, device_map = _model_load_settings(self.config, torch)
         self.model = AutoModelForCausalLM.from_pretrained(
             self.config.model_path,
-            torch_dtype=torch.bfloat16,  # Use bfloat16 (matches training)
-            device_map=self.config.device,
-            trust_remote_code=True,
+            dtype=dtype,
+            device_map=device_map,
+            trust_remote_code=False,
         )
-
-        # Ensure pad token is set
         if self.tokenizer.pad_token_id is None:
             self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
+        self.tokenizer.truncation_side = "left"
+        print(f"Model loaded with device map: {device_map}")
 
-        print(f"Model loaded on {self.config.device}")
+    def _input_device(self) -> Any:
+        try:
+            return self.model.get_input_embeddings().weight.device
+        except (AttributeError, NotImplementedError):
+            return self.model.device
 
     def query(
         self,
         messages: Messages,
-        tools: Optional[List[Dict[str, Any]]] = None,
+        tools: Optional[list[dict[str, Any]]] = None,
         max_tokens: Optional[int] = None,
-    ) -> Tuple[str, List[Dict[str, Any]]]:
-        """
-        Query the model with the given messages.
-
-        Args:
-            messages: The conversation messages
-            tools: Optional list of tool schemas (for future tool calling support)
-            max_tokens: Maximum tokens to generate
-
-        Returns:
-            Tuple of (response_text, tool_calls)
-        """
+    ) -> tuple[str, list[dict[str, Any]]]:
+        del tools  # The fine-tuned local model emits the trained JSON format directly.
         import torch
 
-        # Convert messages to chat format
-        chat_messages = messages.to_chat_format()
-
-        # Apply chat template
-        text = self.tokenizer.apply_chat_template(
-            chat_messages,
-            tokenize=False,
+        inputs = self.tokenizer.apply_chat_template(
+            messages.to_chat_format(),
+            tokenize=True,
             add_generation_prompt=True,
-        )
+            return_dict=True,
+            return_tensors="pt",
+            truncation=True,
+            max_length=self.config.max_seq_length,
+            enable_thinking=False,
+        ).to(self._input_device())
 
-        inputs = self.tokenizer(text, return_tensors="pt").to(self.config.device)
-
-        # Generate
-        with torch.no_grad():
-            output = self.model.generate(
-                **inputs,
-                max_new_tokens=max_tokens or self.config.max_new_tokens,
+        do_sample = self.config.temperature > 0
+        generation_kwargs: dict[str, Any] = {
+            "max_new_tokens": max_tokens or self.config.max_new_tokens,
+            "do_sample": do_sample,
+            "pad_token_id": self.tokenizer.pad_token_id,
+        }
+        if do_sample:
+            generation_kwargs.update(
                 temperature=self.config.temperature,
                 top_p=self.config.top_p,
-                do_sample=self.config.temperature > 0,
-                pad_token_id=self.tokenizer.pad_token_id,
             )
 
-        # Decode response (only the new tokens)
+        with torch.inference_mode():
+            output = self.model.generate(**inputs, **generation_kwargs)
         response = self.tokenizer.decode(
-            output[0][inputs.input_ids.shape[1]:],
-            skip_special_tokens=True
+            output[0][inputs["input_ids"].shape[1] :],
+            skip_special_tokens=True,
         )
+        return response, parse_model_tool_calls(response, self.config.root_dir)
 
-        # Parse tool calls from response
-        tool_calls = self._parse_tool_calls(response)
-
-        return response, tool_calls
-
-    def _parse_tool_calls(self, response: str) -> List[Dict[str, Any]]:
-        """
-        Parse tool calls from the model response.
-
-        The trained model outputs JSON objects for tool calls.
-        This parser extracts them from the response.
-
-        Args:
-            response: The model's text response
-
-        Returns:
-            List of parsed tool calls
-        """
-        tool_calls = []
-        
-        # Strip out thinking tags if present
-        clean_response = response
-        if "</think>" in clean_response:
-            clean_response = clean_response.split("</think>")[-1].strip()
-
-        # Try to parse as direct JSON first
-        try:
-            parsed = json.loads(clean_response.strip())
-            if isinstance(parsed, dict):
-                if "tool" in parsed and "cmd" in parsed:
-                    # Format: {"tool": "exec_bash_command", "cmd": "..."}
-                    tool_calls.append({
-                        "id": "call_0",
-                        "function": {
-                            "name": parsed["tool"],
-                            "arguments": json.dumps({"cmd": parsed["cmd"]})
-                        }
-                    })
-                    return tool_calls
-                elif "command" in parsed:
-                    # Format from training: {"command": "build", "tag": "..."}
-                    # Convert to bash command
-                    cmd = self._json_to_bash_command(parsed)
-                    if cmd:
-                        tool_calls.append({
-                            "id": "call_0",
-                            "function": {
-                                "name": "exec_bash_command",
-                                "arguments": json.dumps({"cmd": cmd})
-                            }
-                        })
-                        return tool_calls
-        except json.JSONDecodeError:
-            pass
-
-        # Try to extract JSON from the response by finding balanced braces
-        # This handles JSON with nested objects
-        start_idx = clean_response.find('{')
-        if start_idx != -1:
-            brace_count = 0
-            end_idx = start_idx
-            for i, char in enumerate(clean_response[start_idx:], start_idx):
-                if char == '{':
-                    brace_count += 1
-                elif char == '}':
-                    brace_count -= 1
-                    if brace_count == 0:
-                        end_idx = i + 1
-                        break
-            
-            if end_idx > start_idx:
-                json_str = clean_response[start_idx:end_idx]
-                try:
-                    parsed = json.loads(json_str)
-                    if isinstance(parsed, dict):
-                        if "tool" in parsed and "cmd" in parsed:
-                            tool_calls.append({
-                                "id": "call_0",
-                                "function": {
-                                    "name": parsed["tool"],
-                                    "arguments": json.dumps({"cmd": parsed["cmd"]})
-                                }
-                            })
-                        elif "command" in parsed:
-                            cmd = self._json_to_bash_command(parsed)
-                            if cmd:
-                                tool_calls.append({
-                                    "id": "call_0",
-                                    "function": {
-                                        "name": "exec_bash_command",
-                                        "arguments": json.dumps({"cmd": cmd})
-                                    }
-                                })
-                except json.JSONDecodeError:
-                    pass
-
-        return tool_calls
-
-    def _json_to_bash_command(self, parsed: Dict[str, Any]) -> Optional[str]:
-        """
-        Convert a parsed JSON command to a bash command string.
-
-        Args:
-            parsed: The parsed JSON object from model output
-
-        Returns:
-            The bash command string, or None if invalid
-        """
-        command = parsed.get("command")
-        if not command:
-            return None
-
-        # Build the langgraph command
-        cmd_parts = ["langgraph", command]
-
-        # Add flags based on command type
-        if command == "new":
-            if parsed.get("template"):
-                cmd_parts.extend(["--template", parsed["template"]])
-            if parsed.get("path"):
-                cmd_parts.append(parsed["path"])
-
-        elif command == "dev":
-            if parsed.get("port"):
-                cmd_parts.extend(["--port", str(parsed["port"])])
-            if parsed.get("no_browser"):
-                cmd_parts.append("--no-browser")
-
-        elif command == "up":
-            if parsed.get("port"):
-                cmd_parts.extend(["--port", str(parsed["port"])])
-            if parsed.get("watch"):
-                cmd_parts.append("--watch")
-
-        elif command == "build":
-            if parsed.get("tag"):
-                cmd_parts.extend(["-t", parsed["tag"]])
-
-        elif command == "dockerfile":
-            if parsed.get("output_path"):
-                cmd_parts.extend(["-o", parsed["output_path"]])
-
-        return " ".join(cmd_parts)
+    def _parse_tool_calls(self, response: str) -> list[dict[str, Any]]:
+        """Backward-compatible entry point used by the tutorial notebook."""
+        return parse_model_tool_calls(response, self.config.root_dir)
 
 
 class OpenAILLM:
-    """
-    LLM wrapper for OpenAI-compatible API (e.g., vLLM, TGI).
-
-    Use this when running the model as a server.
-    """
+    """Chat Completions wrapper for OpenAI-protocol model servers."""
 
     def __init__(self, config: Config):
         from openai import OpenAI
 
         self.config = config
-        self.client = OpenAI(
-            base_url=config.api_base_url,
-            api_key=config.api_key,
-        )
+        self.client = OpenAI(base_url=config.api_base_url, api_key=config.api_key)
         print(f"Using API at: {config.api_base_url}")
 
     def query(
         self,
         messages: Messages,
-        tools: Optional[List[Dict[str, Any]]] = None,
+        tools: Optional[list[dict[str, Any]]] = None,
         max_tokens: Optional[int] = None,
-    ) -> Tuple[str, List[Dict[str, Any]]]:
-        """
-        Query the model via OpenAI-compatible API.
-
-        Args:
-            messages: The conversation messages
-            tools: Optional list of tool schemas
-            max_tokens: Maximum tokens to generate
-
-        Returns:
-            Tuple of (response_text, tool_calls)
-        """
-        kwargs = {
+    ) -> tuple[str, list[Any]]:
+        kwargs: dict[str, Any] = {
             "model": self.config.api_model_name,
             "messages": messages.to_list(),
             "temperature": self.config.temperature,
             "top_p": self.config.top_p,
+            "max_completion_tokens": max_tokens or self.config.max_new_tokens,
             "stream": False,
         }
-
-        if max_tokens:
-            kwargs["max_tokens"] = max_tokens
-
+        if self.config.api_send_thinking_override:
+            # vLLM/Nemotron extension; omit it for strict protocol-compatible servers.
+            kwargs["extra_body"] = {
+                "chat_template_kwargs": {"enable_thinking": False},
+            }
         if tools:
             kwargs["tools"] = tools
+            kwargs["parallel_tool_calls"] = False
 
         completion = self.client.chat.completions.create(**kwargs)
+        message = completion.choices[0].message
+        content = message.content or ""
+        tool_calls = list(message.tool_calls or [])
+        if not tool_calls and content:
+            tool_calls = parse_model_tool_calls(content, self.config.root_dir)
+        return content, tool_calls
 
-        return (
-            completion.choices[0].message.content or "",
-            completion.choices[0].message.tool_calls or [],
-        )
 
-
-def get_llm(config: Config):
-    """
-    Factory function to get the appropriate LLM based on config.
-
-    Args:
-        config: The application configuration
-
-    Returns:
-        Either HuggingFaceLLM or OpenAILLM based on config.use_api
-    """
-    if config.use_api:
-        return OpenAILLM(config)
-    else:
-        return HuggingFaceLLM(config)
+def get_llm(config: Config) -> HuggingFaceLLM | OpenAILLM:
+    return OpenAILLM(config) if config.use_api else HuggingFaceLLM(config)
