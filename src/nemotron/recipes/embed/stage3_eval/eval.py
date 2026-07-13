@@ -160,7 +160,7 @@ class NIMEmbeddingModel:
             payload_data = {
                 "texts": texts,
                 "model": self.model,
-                "input_type": input_type,
+                "input_type": "document" if input_type == "passage" else input_type,
                 "embedding_types": ["float"],
             }
         else:
