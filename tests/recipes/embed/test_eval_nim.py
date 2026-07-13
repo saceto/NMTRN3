@@ -133,7 +133,7 @@ def test_vllm_requests_use_v2_embed_input_types_without_manual_prefixes(monkeypa
             {
                 "texts": ["document text"],
                 "model": "test/model",
-                "input_type": "passage",
+                "input_type": "document",
                 "embedding_types": ["float"],
             },
         ),
