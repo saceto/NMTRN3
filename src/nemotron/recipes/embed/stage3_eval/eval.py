@@ -67,7 +67,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Literal
 
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, model_validator
 
 from nemo_runspec.config.pydantic_loader import RecipeSettings, load_config, parse_config_and_overrides
 
@@ -107,6 +107,7 @@ class NIMEmbeddingModel:
             expected_dimension: Required embedding dimension, if known.
             api_backend: Request and health-check conventions used by the server.
         """
+        self.service_name = "vLLM" if api_backend == "vllm" else "NIM"
         self.api_url = api_url.rstrip("/")
         endpoint = "/v2/embed" if api_backend == "vllm" else "/v1/embeddings"
         self.embeddings_url = f"{self.api_url}{endpoint}"
@@ -217,12 +218,14 @@ class NIMEmbeddingModel:
         """Require one stable embedding dimension across the full evaluation."""
         dimensions = {len(embedding) for embedding in embeddings}
         if len(dimensions) != 1:
-            raise RuntimeError(f"NIM returned inconsistent embedding dimensions: {sorted(dimensions)}")
+            raise RuntimeError(f"{self.service_name} returned inconsistent embedding dimensions: {sorted(dimensions)}")
         dimension = dimensions.pop()
         if self.embedding_dimension is None:
             self.embedding_dimension = dimension
         elif dimension != self.embedding_dimension:
-            raise RuntimeError(f"NIM returned embedding dimension {dimension}; expected {self.embedding_dimension}")
+            raise RuntimeError(
+                f"{self.service_name} returned embedding dimension {dimension}; expected {self.embedding_dimension}"
+            )
 
     def _encode_batch(
         self,
@@ -232,7 +235,7 @@ class NIMEmbeddingModel:
         """Encode a batch, retrying transient invalid vectors independently."""
         embeddings = self._request_batch(texts, input_type)
         if len(embeddings) != len(texts):
-            raise RuntimeError(f"NIM returned {len(embeddings)} embeddings for {len(texts)} inputs")
+            raise RuntimeError(f"{self.service_name} returned {len(embeddings)} embeddings for {len(texts)} inputs")
 
         for retry_number in range(self.invalid_embedding_retries + 1):
             invalid_indices = [
@@ -246,21 +249,23 @@ class NIMEmbeddingModel:
 
             attempt = retry_number + 1
             print(
-                f"Warning: NIM returned {len(invalid_indices)} invalid embedding(s); "
+                f"Warning: {self.service_name} returned {len(invalid_indices)} invalid embedding(s); "
                 f"retrying affected inputs ({attempt}/{self.invalid_embedding_retries})."
             )
             for index in invalid_indices:
                 self.invalid_embedding_retry_requests += 1
                 retry_embeddings = self._request_batch([texts[index]], input_type)
                 if len(retry_embeddings) != 1:
-                    raise RuntimeError(f"NIM returned {len(retry_embeddings)} retry embeddings for 1 input")
+                    raise RuntimeError(
+                        f"{self.service_name} returned {len(retry_embeddings)} retry embeddings for 1 input"
+                    )
                 embeddings[index] = retry_embeddings[0]
 
         invalid_indices = [
             index for index, embedding in enumerate(embeddings) if not self._embedding_is_valid(embedding)
         ]
         raise RuntimeError(
-            f"NIM returned invalid embeddings after {self.invalid_embedding_retries} retries "
+            f"{self.service_name} returned invalid embeddings after {self.invalid_embedding_retries} retries "
             f"at batch indices {invalid_indices}"
         )
 
@@ -432,6 +437,15 @@ class EvalConfig(RecipeSettings):
         default=False,
         description="Fail when NIM/checkpoint metric drift exceeds configured tolerances.",
     )
+
+    @model_validator(mode="after")
+    def _validate_metric_drift_gate(self):
+        if self.fail_on_nim_metric_drift and not self.eval_finetuned:
+            raise ValueError("fail_on_nim_metric_drift=true requires eval_finetuned=true")
+        if self.fail_on_nim_metric_drift and not self.eval_nim:
+            raise ValueError("fail_on_nim_metric_drift=true requires eval_nim=true")
+        return self
+
 
 
 @contextmanager
@@ -671,8 +685,10 @@ def run_eval(cfg: EvalConfig) -> dict:
         "nim_model": cfg.nim_model if cfg.eval_nim else None,
         "embedding_api_backend": cfg.embedding_api_backend if cfg.eval_nim else None,
     }
-    nim_diagnostics: dict[str, int | str | None] | None = None
-    nim_metric_comparison: dict | None = None
+    api_result_key = cfg.embedding_api_backend
+    api_display_name = "vLLM" if cfg.embedding_api_backend == "vllm" else "NIM"
+    api_diagnostics: dict[str, int | str | None] | None = None
+    api_metric_comparison: dict | None = None
     drift_failure = False
 
     # Evaluate base model
@@ -698,6 +714,10 @@ def run_eval(cfg: EvalConfig) -> dict:
     # Evaluate fine-tuned model
     if cfg.eval_finetuned:
         if not cfg.finetuned_model_path.exists():
+            if cfg.fail_on_nim_metric_drift:
+                raise FileNotFoundError(
+                    f"Fine-tuned model required for metric-drift gate was not found at {cfg.finetuned_model_path}"
+                )
             print(f"Warning: Fine-tuned model not found at {cfg.finetuned_model_path}")
             print("         Skipping fine-tuned model evaluation.")
         else:
@@ -723,7 +743,7 @@ def run_eval(cfg: EvalConfig) -> dict:
     if cfg.eval_nim:
         print(f"📈 Evaluating {cfg.embedding_api_backend} endpoint: {cfg.nim_url}")
         try:
-            nim_metrics, _, nim_diagnostics = evaluate_nim(
+            api_metrics, _, api_diagnostics = evaluate_nim(
                 nim_url=cfg.nim_url,
                 nim_model=cfg.nim_model,
                 dataset_path=cfg.eval_data_path,
@@ -734,8 +754,8 @@ def run_eval(cfg: EvalConfig) -> dict:
                 api_backend=cfg.embedding_api_backend,
                 k_values=cfg.k_values,
             )
-            results["nim"] = nim_metrics
-            _print_summary_metrics(nim_metrics, cfg.k_values)
+            results[api_result_key] = api_metrics
+            _print_summary_metrics(api_metrics, cfg.k_values)
             print()
         except Exception as error:
             print(f"   Error evaluating embedding API: {error}")
@@ -762,8 +782,8 @@ def run_eval(cfg: EvalConfig) -> dict:
 
     # Compare aggregate retrieval behavior. This is not a model-identity proof:
     # local Hugging Face and NIM preprocessing/runtime paths may differ.
-    if "finetuned" in results and "nim" in results:
-        print("📊 Behavioral metric comparison (Fine-tuned -> NIM)")
+    if "finetuned" in results and api_result_key in results:
+        print(f"📊 Behavioral metric comparison (Fine-tuned -> {api_display_name})")
         print("=" * 60)
         print("   Informational unless fail_on_nim_metric_drift=true.")
         print("   Artifact mount/fingerprint validation establishes deployment identity.")
@@ -779,24 +799,24 @@ def run_eval(cfg: EvalConfig) -> dict:
             deltas[name] = {}
             for key in results["finetuned"][idx]:
                 ft_val = results["finetuned"][idx][key]
-                nim_val = results["nim"][idx][key]
-                diff = nim_val - ft_val
+                api_val = results[api_result_key][idx][key]
+                diff = api_val - ft_val
                 at_k = int(key.split("@")[1]) if "@" in key else 1
                 threshold = cfg.nim_metric_low_k_tolerance if at_k < 5 else cfg.nim_metric_tolerance
                 metric_within_tolerance = abs(diff) <= threshold
                 within_tolerance = within_tolerance and metric_within_tolerance
                 deltas[name][key] = {
                     "checkpoint": ft_val,
-                    "nim": nim_val,
+                    api_result_key: api_val,
                     "delta": diff,
                     "tolerance": threshold,
                     "within_tolerance": metric_within_tolerance,
                 }
                 label = "within tolerance" if metric_within_tolerance else "drift"
-                print(f"    {key}: {ft_val:.5f} → {nim_val:.5f} ({diff:+.5f}) [{label}]")
+                print(f"    {key}: {ft_val:.5f} → {api_val:.5f} ({diff:+.5f}) [{label}]")
         print()
 
-        nim_metric_comparison = {
+        api_metric_comparison = {
             "kind": "aggregate_behavioral_metric_drift",
             "model_identity_proof": False,
             "within_tolerance": within_tolerance,
@@ -818,8 +838,8 @@ def run_eval(cfg: EvalConfig) -> dict:
             "Precision": metrics[3],
         }
 
-    metadata["nim_diagnostics"] = nim_diagnostics
-    metadata["nim_metric_comparison"] = nim_metric_comparison
+    metadata[f"{api_result_key}_diagnostics"] = api_diagnostics
+    metadata[f"{api_result_key}_metric_comparison"] = api_metric_comparison
     serializable_results["_metadata"] = metadata
 
     with open(results_file, "w") as f:

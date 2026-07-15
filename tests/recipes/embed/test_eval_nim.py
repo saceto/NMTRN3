@@ -342,3 +342,83 @@ def test_nim_metric_drift_gate_writes_evidence_before_failing(monkeypatch, tmp_p
     comparison = saved["_metadata"]["nim_metric_comparison"]
     assert comparison["within_tolerance"] is False
     assert comparison["fail_on_drift"] is True
+
+
+@pytest.mark.parametrize(
+    "overrides,expected_error",
+    [
+        ({"eval_finetuned": False, "eval_nim": True}, "requires eval_finetuned=true"),
+        ({"eval_finetuned": True, "eval_nim": False}, "requires eval_nim=true"),
+    ],
+)
+def test_metric_drift_gate_requires_both_evaluation_paths(overrides, expected_error) -> None:
+    from nemotron.recipes.embed.stage3_eval import eval as eval_module
+
+    with pytest.raises(ValueError, match=expected_error):
+        eval_module.EvalConfig(fail_on_nim_metric_drift=True, **overrides)
+
+
+def test_metric_drift_gate_requires_finetuned_checkpoint(tmp_path) -> None:
+    from nemotron.recipes.embed.stage3_eval import eval as eval_module
+
+    eval_data = tmp_path / "eval"
+    eval_data.mkdir()
+    cfg = eval_module.EvalConfig(
+        eval_data_path=eval_data,
+        finetuned_model_path=tmp_path / "missing-checkpoint",
+        output_dir=tmp_path / "output",
+        eval_base=False,
+        eval_finetuned=True,
+        eval_nim=True,
+        fail_on_nim_metric_drift=True,
+    )
+
+    with pytest.raises(FileNotFoundError, match="required for metric-drift gate"):
+        eval_module.run_eval(cfg)
+
+
+def test_vllm_comparison_uses_backend_specific_result_labels(monkeypatch, tmp_path, capsys) -> None:
+    from nemotron.recipes.embed.stage3_eval import eval as eval_module
+
+    eval_data = tmp_path / "eval"
+    finetuned_model = tmp_path / "checkpoint"
+    output_dir = tmp_path / "vllm-comparison"
+    eval_data.mkdir()
+    finetuned_model.mkdir()
+    metrics = _metrics(0.5, 0.7)
+
+    monkeypatch.setattr(eval_module, "evaluate_model", lambda **kwargs: (metrics, {}))
+    monkeypatch.setattr(
+        eval_module,
+        "evaluate_nim",
+        lambda **kwargs: (
+            metrics,
+            {},
+            {
+                "api_backend": "vllm",
+                "requested_model": "nvidia/nemotron-3-embed-1b",
+                "embedding_dimension": 2048,
+                "invalid_embedding_retry_requests": 0,
+            },
+        ),
+    )
+    monkeypatch.setattr(eval_module, "_release_cuda_memory", lambda: None)
+
+    cfg = eval_module.EvalConfig(
+        eval_data_path=eval_data,
+        finetuned_model_path=finetuned_model,
+        output_dir=output_dir,
+        eval_base=False,
+        eval_finetuned=True,
+        eval_nim=True,
+        embedding_api_backend="vllm",
+    )
+    eval_module.run_eval(cfg)
+
+    saved = json.loads((output_dir / "eval_results.json").read_text())
+    comparison = saved["_metadata"]["vllm_metric_comparison"]
+    assert "vllm" in saved
+    assert "nim" not in saved
+    assert saved["_metadata"]["vllm_diagnostics"]["api_backend"] == "vllm"
+    assert comparison["deltas"]["NDCG"]["NDCG@10"]["vllm"] == pytest.approx(0.5)
+    assert "Fine-tuned -> vLLM" in capsys.readouterr().out
