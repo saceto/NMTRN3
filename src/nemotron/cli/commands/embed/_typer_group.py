@@ -21,7 +21,7 @@ fine-tuning workflow:
 - finetune: Fine-tune the embedding model
 - eval: Evaluate models on retrieval metrics
 - export: Export Llama models to ONNX/TensorRT when required
-- deploy: Deploy NIM with a direct checkpoint or exported Llama model
+- deploy: Deploy with NIM or vLLM using a direct checkpoint or exported model
 """
 
 from __future__ import annotations
@@ -66,7 +66,7 @@ def info() -> None:
     console.print("  3. [cyan]finetune[/] - Fine-tune the embedding model")
     console.print("  4. [cyan]eval[/]     - Evaluate base vs fine-tuned models")
     console.print("  5. [cyan]export[/]   - Export Llama model (default skips)")
-    console.print("  6. [cyan]deploy[/]   - Deploy checkpoint or exported model with NIM")
+    console.print("  6. [cyan]deploy[/]   - Deploy checkpoint or exported model with NIM or vLLM")
     console.print()
     console.print("[bold]Key Components:[/bold]")
     console.print("  - retriever-sdg (synthetic data generation)")

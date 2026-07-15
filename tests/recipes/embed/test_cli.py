@@ -57,7 +57,7 @@ class TestEmbedAppStructure:
         assert "finetune" in result.output
         assert "default: nvidia/Nemotron-3-Embed-1B-BF16" in result.output
         assert "llama: nvidia/llama-nemotron-embed-1b-v2" in result.output
-
+        assert "with NIM or vLLM" in result.output
 
     def test_deploy_help_shows_direct_checkpoint_defaults(self):
         result = runner.invoke(app, ["embed", "deploy", "--help"])

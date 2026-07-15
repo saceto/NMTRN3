@@ -90,11 +90,11 @@ class DeployConfig(RecipeSettings):
     )
     vllm_image: str = Field(
         default="nvcr.io/nvidia/vllm:26.06-py3",
-        description="NVIDIA vLLM container image to use for the vLLM backend.",
+        description="vLLM container image to use for the vLLM backend.",
     )
     nim_model: str = Field(
         default="nvidia/nemotron-3-embed-1b",
-        description="Model identifier sent to the NIM embeddings API.",
+        description="Model identifier advertised by the selected embedding service.",
     )
     container_name: str = Field(default="nemotron-embed-nim", description="Name for the Docker container.")
 
@@ -503,9 +503,9 @@ def run_deploy(cfg: DeployConfig) -> dict:
             print(f"   curl -X POST {result['api_url']} \\")
             print("     -H 'Content-Type: application/json' \\")
             if cfg.backend == "vllm":
-                print(f'     -d \'{{"texts": ["hello world"], "model": "{cfg.nim_model}", "input_type": "query"}}}}\'')
+                print(f'     -d \'{{"texts": ["hello world"], "model": "{cfg.nim_model}", "input_type": "query"}}\'')
             else:
-                print(f'     -d \'{{"input": ["hello world"], "model": "{cfg.nim_model}", "input_type": "query"}}}}\'')
+                print(f'     -d \'{{"input": ["hello world"], "model": "{cfg.nim_model}", "input_type": "query"}}\'')
             print()
             print(f"   Stop with: docker stop {cfg.container_name}")
         else:

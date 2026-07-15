@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import urllib.request
 from types import SimpleNamespace
 
@@ -15,6 +16,11 @@ TEST_VLLM_IMAGE = "nvcr.io/nvidia/vllm:26.06-py3"
 
 def _deploy_config(**kwargs) -> deploy.DeployConfig:
     return deploy.DeployConfig(nim_image=TEST_NIM_IMAGE, **kwargs)
+
+
+def test_vllm_image_description_uses_neutral_product_name() -> None:
+    description = deploy.DeployConfig.model_fields["vllm_image"].description
+    assert description == "vLLM container image to use for the vLLM backend."
 
 
 def test_docker_command_does_not_contain_ngc_secret(monkeypatch, tmp_path) -> None:
@@ -250,3 +256,38 @@ def test_detached_health_timeout_can_be_explicitly_allowed(monkeypatch, tmp_path
     result = deploy.run_deploy(cfg)
 
     assert result["container_id"] == "container-id"
+
+
+@pytest.mark.parametrize(("backend", "input_field"), [("nim", "input"), ("vllm", "texts")])
+def test_detached_success_prints_valid_smoke_payload(monkeypatch, tmp_path, capsys, backend, input_field) -> None:
+    model_dir = tmp_path / "model"
+    model_dir.mkdir()
+    cfg = _deploy_config(
+        backend=backend,
+        vllm_image=TEST_VLLM_IMAGE,
+        model_dir=model_dir,
+        detach=True,
+    )
+
+    monkeypatch.setattr(deploy, "check_docker", lambda: True)
+    monkeypatch.setattr(deploy, "check_nvidia_docker", lambda: True)
+    monkeypatch.setattr(deploy, "model_artifact_errors", lambda cfg: [])
+    monkeypatch.setattr(deploy, "stop_existing_container", lambda name: None)
+    monkeypatch.setattr(deploy, "build_docker_command", lambda cfg: ["docker", "run"])
+    monkeypatch.setattr(deploy, "build_docker_environment", lambda cfg: {})
+    monkeypatch.setattr(deploy, "wait_for_health", lambda cfg: True)
+    monkeypatch.setattr(
+        deploy.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(returncode=0, stdout="container-id", stderr=""),
+    )
+
+    deploy.run_deploy(cfg)
+
+    payload_line = next(line for line in capsys.readouterr().out.splitlines() if "-d '" in line)
+    payload = payload_line.split("-d '", 1)[1].rsplit("'", 1)[0]
+    assert json.loads(payload) == {
+        input_field: ["hello world"],
+        "model": cfg.nim_model,
+        "input_type": "query",
+    }
