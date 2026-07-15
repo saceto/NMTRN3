@@ -242,8 +242,7 @@ nemotron embed eval -c default
 # Stage 4 is an intentional no-op for this profile.
 nemotron embed export -c default
 
-# Option A: deploy with a compatible Retriever NIM image.
-export NEMOTRON3_EMBED_NIM_IMAGE=nvcr.io/your-compatible-embedding-nim:tag
+# Option A: deploy with the default Retriever NIM 2.2 image.
 nemotron embed deploy -c default detach=true
 nemotron embed eval -c default eval_nim=true eval_base=false eval_finetuned=true \
   output_dir=./output/embed/nemotron-3-1b/stage3_eval_nim_comparison
@@ -263,7 +262,7 @@ Model-dependent artifacts are isolated
 under `output/embed/nemotron-3-1b/`. Both deploy backends mount
 `stage2_finetune/checkpoints/LATEST/model/consolidated` read-only at `/model`
 without ONNX or TensorRT conversion. NIM selects it through
-`NIM_ENGINE_MODEL_PATH=/model`; vLLM runs `vllm serve /model` and detects the
+`NIM_MODEL_PATH=/model`; vLLM runs `vllm serve /model` and detects the
 checkpoint's embedding configuration automatically.
 Because the artifact is already local, neither path forwards `NGC_API_KEY`
 into the container.
@@ -318,7 +317,7 @@ Stages are designed to run sequentially, but you can start from any stage if you
 | **Stage 5** | Model checkpoint or exported artifact | Deploy existing model |
 
 The default profile loads the Stage 2 Hugging Face-style PyTorch checkpoint
-directly through `NIM_ENGINE_MODEL_PATH`, so Stage 4 is an explicit no-op.
+directly through `NIM_MODEL_PATH`, so Stage 4 is an explicit no-op.
 
 For stage-specific input requirements and options, run `nemotron embed <stage> --help`. In a source checkout, inspect the corresponding `config/default.yaml` file for default paths and settings.
 
@@ -497,7 +496,7 @@ enabled: false
 backend: nim  # Override with backend=vllm
 vllm_image: nvcr.io/nvidia/vllm:26.06-py3
 model_dir: ./output/embed/nemotron-3-1b/stage2_finetune/checkpoints/LATEST/model/consolidated
-model_path_env: NIM_ENGINE_MODEL_PATH
+model_path_env: NIM_MODEL_PATH
 container_model_path: /model
 max_seq_len: null  # Use the NIM image default; vLLM reads checkpoint metadata
 ```
@@ -603,7 +602,7 @@ Model: fine-tuned
 | Recipe sequence length | 512 |
 | Deployment backend | Retriever NIM or vLLM |
 | Serving input artifact | Hugging Face PyTorch/safetensors checkpoint |
-| NIM selector | `NIM_ENGINE_MODEL_PATH` when using NIM |
+| NIM selector | `NIM_MODEL_PATH` when using NIM |
 | Stage 4 | Skipped for the default profile |
 
 ## Troubleshooting
@@ -700,7 +699,7 @@ nemotron embed eval -c default finetuned_model_path=/path/to/checkpoint
 
 ### Stage 5: Deployment Issues
 
-**Error: NIM image is not configured**
+**Override the default NIM image**
 ```bash
 export NEMOTRON3_EMBED_NIM_IMAGE=nvcr.io/your-compatible-embedding-nim:tag
 nemotron embed deploy -c default

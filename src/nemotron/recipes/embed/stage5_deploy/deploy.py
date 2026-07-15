@@ -30,11 +30,11 @@
 
 """Deploy an embedding service with a custom model checkpoint.
 
-The default backend launches NVIDIA NIM. Retriever Embedding NIM 2.1.0 and
-later consume a Hugging Face-style safetensors directory through
-``NIM_ENGINE_MODEL_PATH``. Older NIM images use the ``NIM_CUSTOM_MODEL`` contract for
-exported ONNX/TensorRT artifacts. The optional vLLM backend serves the same
-Hugging Face checkpoint and is evaluated through vLLM's ``/v2/embed`` API.
+The default backend launches Retriever Embedding NIM 2.2.0, which consumes a
+Hugging Face-style safetensors directory through ``NIM_MODEL_PATH``. Older NIM
+images use the ``NIM_CUSTOM_MODEL`` contract for exported ONNX/TensorRT
+artifacts. The optional vLLM backend serves the same Hugging Face checkpoint
+and is evaluated through vLLM's ``/v2/embed`` API.
 
 Usage:
     # With default config (launches NIM in foreground)
@@ -67,6 +67,7 @@ from nemo_runspec.config.pydantic_loader import RecipeSettings, load_config, par
 
 STAGE_PATH = Path(__file__).parent
 DEFAULT_CONFIG_PATH = STAGE_PATH / "config" / "default.yaml"
+DEFAULT_NIM_IMAGE = "nvcr.io/nim/nvidia/nemotron-3-embed-1b:2.2.0"
 
 # Use NEMO_RUN_DIR for output when running via nemo-run
 _OUTPUT_BASE = Path(os.environ.get("NEMO_RUN_DIR", "."))
@@ -85,7 +86,7 @@ class DeployConfig(RecipeSettings):
     # Container settings
     backend: Literal["nim", "vllm"] = Field(default="nim", description="Serving backend to launch.")
     nim_image: str | None = Field(
-        default_factory=lambda: os.environ.get("NEMOTRON3_EMBED_NIM_IMAGE"),
+        default_factory=lambda: os.environ.get("NEMOTRON3_EMBED_NIM_IMAGE", DEFAULT_NIM_IMAGE),
         description="NIM container image to use for the NIM backend.",
     )
     vllm_image: str = Field(
@@ -113,8 +114,8 @@ class DeployConfig(RecipeSettings):
         description="NIM_CUSTOM_MODEL artifact selector. Ignored when model_path_env selects a direct checkpoint.",
     )
     model_path_env: Literal["NIM_CUSTOM_MODEL", "NIM_ENGINE_MODEL_PATH", "NIM_MODEL_PATH"] = Field(
-        default="NIM_ENGINE_MODEL_PATH",
-        description="NIM artifact selector; NIM_ENGINE_MODEL_PATH is the default for Retriever NIM 2.1.0+.",
+        default="NIM_MODEL_PATH",
+        description="NIM artifact selector; NIM_MODEL_PATH is the default for Retriever NIM 2.2.0+.",
     )
     expected_model_fingerprint: dict[str, int] | None = Field(
         default_factory=lambda: {
@@ -167,7 +168,7 @@ class DeployConfig(RecipeSettings):
     forward_ngc_api_key: bool = Field(
         default=False,
         description=(
-            "Forward NGC_API_KEY into the container. Local NIM_ENGINE_MODEL_PATH artifacts "
+            "Forward NGC_API_KEY into the container. Local NIM_MODEL_PATH artifacts "
             "do not require it; enable for NIM_CUSTOM_MODEL or model-download workflows when needed."
         ),
     )
@@ -178,13 +179,11 @@ class DeployConfig(RecipeSettings):
 
     @model_validator(mode="after")
     def _require_selected_backend_image(self) -> DeployConfig:
-        # ``load_pydantic_config`` preserves OmegaConf's quoted empty fallback
-        # as the literal string ``''``. Treat it as unset while leaving the raw
-        # interpolation intact for direct YAML schema validation.
+        # Treat an explicitly empty image override as unset.
         if self.nim_image in {"", "''", '""', "null", "None"}:
             self.nim_image = None
         if self.backend == "nim" and (self.nim_image is None or not self.nim_image.strip()):
-            raise ValueError("NEMOTRON3_EMBED_NIM_IMAGE must be set when backend=nim")
+            raise ValueError("nim_image must be nonempty when backend=nim")
         if self.backend == "vllm" and not self.vllm_image.strip():
             raise ValueError("vllm_image must be set when backend=vllm")
         return self
@@ -281,18 +280,12 @@ def build_docker_command(cfg: DeployConfig) -> list[str]:
             print(f"Warning: {cfg.ngc_api_key_env} not set. NIM may not authenticate properly.")
 
     if cfg.backend == "nim":
-        # NIM 2.1.0+ uses engine-prefixed variables for Hugging Face checkpoints.
-        # The compatible image supplies NIM_ENGINE_MODEL_NAME. Keep NIM_MODEL_NAME
-        # for existing 2.0 deployments that override this setting.
-        if cfg.model_path_env == "NIM_MODEL_PATH":
-            cmd.extend(["-e", f"NIM_MODEL_NAME={cfg.nim_model}"])
+        # NIM 2.2.0+ supplies its own model name and accepts staged weights here.
         cmd.extend(["-e", f"{cfg.model_path_env}={cfg.container_model_path}"])
 
         if cfg.max_seq_len is not None:
             max_seq_len_env = (
-                "NIM_PIPELINE_MAX_SEQ_LEN"
-                if cfg.model_path_env == "NIM_ENGINE_MODEL_PATH"
-                else "NIM_MAX_SEQ_LEN"
+                "NIM_PIPELINE_MAX_SEQ_LEN" if cfg.model_path_env == "NIM_ENGINE_MODEL_PATH" else "NIM_MAX_SEQ_LEN"
             )
             cmd.extend(["-e", f"{max_seq_len_env}={cfg.max_seq_len}"])
         if cfg.pipeline_id:

@@ -52,7 +52,7 @@ def test_nim_model_path_mounts_huggingface_checkpoint(monkeypatch, tmp_path) -> 
     cfg = _deploy_config(
         nim_model="nvidia/nemotron-3-embed-1b",
         model_dir=model_dir,
-        model_path_env="NIM_ENGINE_MODEL_PATH",
+        model_path_env="NIM_MODEL_PATH",
         container_model_path="/model",
         container_cache_path="/opt/cache",
         max_seq_len=512,
@@ -60,8 +60,8 @@ def test_nim_model_path_mounts_huggingface_checkpoint(monkeypatch, tmp_path) -> 
     )
     command = deploy.build_docker_command(cfg)
 
-    assert "NIM_ENGINE_MODEL_PATH=/model" in command
-    assert "NIM_PIPELINE_MAX_SEQ_LEN=512" in command
+    assert "NIM_MODEL_PATH=/model" in command
+    assert "NIM_MAX_SEQ_LEN=512" in command
     assert "NIM_PIPELINE_ID=padded-naive-fp16" in command
     assert not any(arg.startswith("NIM_CUSTOM_MODEL=") for arg in command)
     assert "NGC_API_KEY" not in command
@@ -76,15 +76,16 @@ def test_nim_selects_pipeline_automatically_by_default(monkeypatch, tmp_path) ->
 
     cfg = _deploy_config(
         model_dir=model_dir,
-        model_path_env="NIM_ENGINE_MODEL_PATH",
+        model_path_env="NIM_MODEL_PATH",
         container_model_path="/model",
         container_cache_path="/opt/cache",
     )
     command = deploy.build_docker_command(cfg)
 
     assert not any(argument.startswith("NIM_ENGINE_MODEL_NAME=") for argument in command)
+    assert not any(argument.startswith("NIM_MODEL_NAME=") for argument in command)
     assert not any(argument.startswith("NIM_PIPELINE_ID=") for argument in command)
-    assert not any(argument.startswith("NIM_PIPELINE_MAX_SEQ_LEN=") for argument in command)
+    assert not any(argument.startswith("NIM_MAX_SEQ_LEN=") for argument in command)
 
 
 def test_vllm_docker_contract_relies_on_checkpoint_metadata(monkeypatch, tmp_path) -> None:

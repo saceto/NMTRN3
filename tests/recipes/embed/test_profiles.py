@@ -21,6 +21,7 @@ from .conftest import REPO_ROOT
 BASE_MODEL = "nvidia/Nemotron-3-Embed-1B-BF16"
 TEST_SDG_API_BASE_URL = "https://example.invalid/v1"
 NIM_IMAGE = "example.invalid/nim/retriever-embed:test"
+DEFAULT_NIM_IMAGE = "nvcr.io/nim/nvidia/nemotron-3-embed-1b:2.2.0"
 AUTOMODEL_IMAGE = "nvcr.io/nvidia/nemo-automodel:26.06"
 CONFIG_ROOT = REPO_ROOT / "src/nemotron/recipes/embed"
 
@@ -51,7 +52,7 @@ def profile_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("NEMOTRON3_EMBED_DEPLOY_CHECKPOINT", raising=False)
 
 
-def test_public_default_uses_optional_endpoint_and_requires_image_override(
+def test_public_default_uses_optional_endpoint_and_default_nim_image(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from nemo_runspec.config import load_pydantic_config
@@ -65,12 +66,13 @@ def test_public_default_uses_optional_endpoint_and_requires_image_override(
         SDGConfig,
     )
     assert sdg.nvidia_api_base_url is None
-    with pytest.raises(ValueError, match="NEMOTRON3_EMBED_NIM_IMAGE"):
-        load_pydantic_config(
-            CONFIG_ROOT / "stage5_deploy/config/default.yaml",
-            [],
-            DeployConfig,
-        )
+    nim = load_pydantic_config(
+        CONFIG_ROOT / "stage5_deploy/config/default.yaml",
+        [],
+        DeployConfig,
+    )
+    assert nim.nim_image == DEFAULT_NIM_IMAGE
+    assert nim.container_image == DEFAULT_NIM_IMAGE
 
     vllm = load_pydantic_config(
         CONFIG_ROOT / "stage5_deploy/config/default.yaml",
@@ -115,12 +117,12 @@ def test_default_base_model_is_shared_across_model_stages() -> None:
     )
     assert export.trust_remote_code is True
 
+
 @pytest.mark.parametrize("profile", ["default", "llama"])
 def test_finetune_profiles_use_current_automodel_image(profile: str) -> None:
     config = load_config(CONFIG_ROOT / f"stage2_finetune/config/{profile}.yaml")
 
     assert config.run.env.container == AUTOMODEL_IMAGE
-
 
 
 def test_default_sdg_uses_configured_api() -> None:
@@ -144,7 +146,7 @@ def test_default_nim_identity_is_shared_by_eval_and_deploy() -> None:
     assert deploy.nim_image == NIM_IMAGE
     assert deploy.vllm_image == "nvcr.io/nvidia/vllm:26.06-py3"
     assert deploy.model_dir == Path("output/embed/nemotron-3-1b/stage2_finetune/checkpoints/LATEST/model/consolidated")
-    assert deploy.model_path_env == "NIM_ENGINE_MODEL_PATH"
+    assert deploy.model_path_env == "NIM_MODEL_PATH"
     assert deploy.use_onnx is False
     assert deploy.expected_model_fingerprint == {
         "hidden_size": 2048,
@@ -259,7 +261,7 @@ def test_default_profile_is_ministral_with_direct_checkpoint_deploy() -> None:
     assert export.enabled is False
     assert deploy.nim_image == NIM_IMAGE
     assert deploy.backend == "nim"
-    assert deploy.model_path_env == "NIM_ENGINE_MODEL_PATH"
+    assert deploy.model_path_env == "NIM_MODEL_PATH"
     assert deploy.use_onnx is False
     assert deploy.model_dir == finetune.checkpoint_dir / "LATEST/model/consolidated"
 
