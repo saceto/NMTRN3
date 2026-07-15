@@ -59,6 +59,9 @@ docker run --rm --name nemotron-ultra-vllm \
   --port 8000 \
   --tensor-parallel-size 1 \
   --trust-remote-code \
+  --speculative-config '{"method": "nemotron_h_mtp", "num_speculative_tokens": 3}' \
+  --enable-auto-tool-choice \
+  --tool-call-parser qwen3_coder \
   --cpu-offload-gb 150 \
   --cpu-offload-params experts \
   --kernel_config '{"enable_flashinfer_autotune": false}' \
