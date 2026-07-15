@@ -1,4 +1,4 @@
-# Default model family: Ministral-based Nemotron 3 Embed.
+# Default model family: Nemotron 3 Embed.
 # Stage 5: Deploy Configuration
 #
 # Launches a NIM or vLLM embedding service with a custom fine-tuned model.
@@ -28,7 +28,7 @@ vllm_image: nvcr.io/nvidia/vllm:26.06-py3
 nim_model: ${oc.env:NEMOTRON3_EMBED_NIM_MODEL,nvidia/nemotron-3-embed-1b}
 
 # Container name (for management)
-container_name: nemotron-embed-nim
+container_name: nemotron-embed
 
 # Fine-tuned Hugging Face checkpoint mounted directly by Retriever NIM 2.x
 model_dir: ${oc.env:NEMOTRON3_EMBED_DEPLOY_CHECKPOINT,${artifact_root}/stage2_finetune/checkpoints/LATEST/model/consolidated}

@@ -23,7 +23,7 @@ nim_image: nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2:1.10.1
 nim_model: nvidia/llama-3.2-nv-embedqa-1b-v2
 
 # Container name (for management)
-container_name: nemotron-embed-nim
+container_name: nemotron-embed
 
 # Path to custom model (ONNX or TensorRT from stage4_export)
 model_dir: ${artifact_root}/stage4_export/onnx

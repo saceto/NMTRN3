@@ -96,7 +96,7 @@ class DeployConfig(RecipeSettings):
         default="nvidia/nemotron-3-embed-1b",
         description="Model identifier advertised by the selected embedding service.",
     )
-    container_name: str = Field(default="nemotron-embed-nim", description="Name for the Docker container.")
+    container_name: str = Field(default="nemotron-embed", description="Name for the Docker container.")
 
     # Model settings
     model_dir: Path = Field(
