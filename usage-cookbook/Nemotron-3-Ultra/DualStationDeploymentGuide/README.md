@@ -210,7 +210,8 @@ sudo docker run -d --name nemotron-ultra-head \
   -v "${HOME}/.cache/huggingface:/models/huggingface" \
   --entrypoint bash "${IMAGE}" -lc '
     set -euo pipefail
-    python3 -m pip install --break-system-packages "ray[cgraph]"
+    python3 -m pip install --break-system-packages "ray==2.56.0"
+    python3 -m pip install --break-system-packages --ignore-installed "blinker==1.9.0" "aiperf==0.11.0"
     ray start --head --node-ip-address="${HEAD_IP}" --port=6379 --num-gpus=1
 
     python3 - <<"PY"
@@ -301,7 +302,7 @@ sudo docker run -d --name nemotron-ultra-worker \
   -v "${HOME}/.cache/huggingface:/models/huggingface" \
   --entrypoint bash "${IMAGE}" -lc '
     set -euo pipefail
-    python3 -m pip install --break-system-packages "ray[cgraph]"
+    python3 -m pip install --break-system-packages "ray==2.56.0"
     exec ray start --address="${HEAD_IP}:6379" \
       --node-ip-address="${WORKER_IP}" --num-gpus=1 --block
   '
