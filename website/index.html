@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NVIDIA Nemotron — Open Models for Agentic AI</title>
+  <meta name="description" content="Training recipes, deployment guides, and use-case examples for the NVIDIA Nemotron model family." />
+  <style>
+    :root {
+      --nvidia-green: #76b900;
+      --bg: #0d1117;
+      --bg-card: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    .container { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+    header {
+      padding: 96px 0 64px;
+      text-align: center;
+      background: radial-gradient(ellipse at top, rgba(118, 185, 0, 0.12), transparent 60%);
+    }
+    .badge {
+      display: inline-block;
+      border: 1px solid var(--nvidia-green);
+      color: var(--nvidia-green);
+      border-radius: 999px;
+      padding: 4px 14px;
+      font-size: 13px;
+      margin-bottom: 24px;
+    }
+    h1 { font-size: 48px; line-height: 1.15; margin-bottom: 16px; }
+    h1 .accent { color: var(--nvidia-green); }
+    .subtitle { color: var(--text-muted); font-size: 20px; max-width: 640px; margin: 0 auto 32px; }
+    .buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      display: inline-block;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: var(--nvidia-green); color: #0d1117; }
+    .btn-secondary { border: 1px solid var(--border); color: var(--text); }
+    section { padding: 56px 0; }
+    h2 { font-size: 30px; margin-bottom: 8px; }
+    .section-sub { color: var(--text-muted); margin-bottom: 32px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .card h3 { font-size: 18px; margin-bottom: 8px; }
+    .card h3 .tier { color: var(--nvidia-green); }
+    .card p { color: var(--text-muted); font-size: 14px; }
+    .card .spec { color: var(--text); font-size: 13px; margin-top: 12px; font-family: ui-monospace, monospace; }
+    .card a { color: var(--nvidia-green); font-size: 14px; text-decoration: none; }
+    .card a:hover { text-decoration: underline; }
+    .pipeline { color: var(--text-muted); font-size: 13px; margin-top: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+    th { color: var(--nvidia-green); font-weight: 600; }
+    td { color: var(--text-muted); }
+    td strong { color: var(--text); }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); }
+    pre {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      overflow-x: auto;
+      font-size: 14px;
+      color: var(--text);
+    }
+    pre .c { color: var(--text-muted); }
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 0;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+    footer a { color: var(--nvidia-green); text-decoration: none; }
+    @media (max-width: 640px) { h1 { font-size: 34px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container">
+      <div class="badge">NVIDIA Nemotron Developer Repository</div>
+      <h1>Open and efficient models<br />for <span class="accent">agentic AI</span></h1>
+      <p class="subtitle">Training recipes, deployment guides, and use-case examples for the Nemotron model family — fully transparent data, techniques, and weights.</p>
+      <div class="buttons">
+        <a class="btn btn-primary" href="https://github.com/saceto/NMTRN3">View on GitHub</a>
+        <a class="btn btn-secondary" href="https://nvidia-nemo.github.io/Nemotron/dev/">Documentation</a>
+        <a class="btn btn-secondary" href="https://huggingface.co/nvidia">Model Weights</a>
+      </div>
+    </div>
+  </header>
+
+  <section>
+    <div class="container">
+      <h2>Why Nemotron?</h2>
+      <p class="section-sub">Purpose-built for coding, math, scientific reasoning, tool calling, and visual reasoning.</p>
+      <div class="grid">
+        <div class="card">
+          <h3>Open Models</h3>
+          <p>Fully transparent training data, techniques, and weights for community innovation.</p>
+        </div>
+        <div class="card">
+          <h3>Compute Efficiency</h3>
+          <p>Model pruning and optimization enabling higher throughput via TensorRT-LLM.</p>
+        </div>
+        <div class="card">
+          <h3>High Accuracy</h3>
+          <p>Built on frontier open models with human-aligned reasoning for agentic workflows.</p>
+        </div>
+        <div class="card">
+          <h3>Flexible Deployment</h3>
+          <p>Deploy anywhere: edge, single GPU, or data center with NIM microservices.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="container">
+      <h2>Model Family</h2>
+      <p class="section-sub">Three tiers spanning edge to datacenter, plus a natively multimodal variant.</p>
+      <div class="grid">
+        <div class="card">
+          <h3><span class="tier">Nemotron 3 Ultra</span></h3>
+          <p>NVIDIA's largest Nemotron 3 model — hybrid Mamba-Attention LatentMoE with MTP and 1M context for datacenter-scale agentic reasoning.</p>
+          <div class="spec">550B total / 55B active · 20T tokens · 1M ctx</div>
+          <div class="pipeline">Pretrain → SFT → RLVR → MOPD</div>
+        </div>
+        <div class="card">
+          <h3><span class="tier">Nemotron 3 Super</span></h3>
+          <p>Frontier Hybrid Mamba Latent MoE Transformer for reasoning, coding, and agentic tasks on a single GPU.</p>
+          <div class="spec">120.6B total / 12.7B active · 21 RL reward envs</div>
+          <div class="pipeline">Pretrain → SFT → RL</div>
+        </div>
+        <div class="card">
+          <h3><span class="tier">Nemotron 3 Nano</span></h3>
+          <p>Efficient MoE hybrid Mamba-Transformer optimized for edge and PC deployment with 3.3× higher inference throughput.</p>
+          <div class="spec">31.6B total / 3.6B active · 25T tokens · 1M ctx</div>
+          <div class="pipeline">Pretrain → SFT → RL</div>
+        </div>
+        <div class="card">
+          <h3><span class="tier">Nemotron 3 Nano Omni</span></h3>
+          <p>Native text, image, video, and audio support — a multimodal perception sub-agent for agentic AI.</p>
+          <div class="spec">30B total / 3B active · multimodal</div>
+          <div class="pipeline">SFT → RL (MPO / text / vision) → Eval</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="container">
+      <h2>What's in the Repository</h2>
+      <p class="section-sub">Pick the section that matches what you're trying to do.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Section</th><th>Purpose</th><th>When to use</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Nemotron Steps</strong><br />src/nemotron/steps/</td>
+              <td>Full lifecycle building blocks: data prep, training, eval, and more via the <code>nemotron steps</code> CLI</td>
+              <td>Run one stage in isolation or compose a custom pipeline</td>
+            </tr>
+            <tr>
+              <td><strong>Training Recipes</strong><br />src/nemotron/recipes/</td>
+              <td>Reproduce full training pipelines from raw data to model</td>
+              <td>Train, fine-tune, or understand how a model was built</td>
+            </tr>
+            <tr>
+              <td><strong>Usage Cookbooks</strong><br />usage-cookbook/</td>
+              <td>Jupyter notebooks with step-by-step deployment guides</td>
+              <td>You have a model and want to deploy or run inference</td>
+            </tr>
+            <tr>
+              <td><strong>Use Case Examples</strong><br />use-case-examples/</td>
+              <td>End-to-end applications: RAG, agents, tool use</td>
+              <td>Build a full application on top of Nemotron</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="container">
+      <h2>Quickstart</h2>
+      <p class="section-sub">Clone the repo and explore the step catalog.</p>
+      <pre><span class="c"># Clone the repository</span>
+git clone https://github.com/saceto/NMTRN3.git
+cd NMTRN3
+
+<span class="c"># Install with uv</span>
+uv sync
+
+<span class="c"># List available pipeline steps</span>
+uv run nemotron steps list</pre>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <p>Apache 2.0 Licensed · <a href="https://github.com/saceto/NMTRN3">GitHub</a> · <a href="https://www.nvidia.com/en-us/ai-data-science/foundation-models/nemotron/">NVIDIA Nemotron</a></p>
+    </div>
+  </footer>
+</body>
+</html>
